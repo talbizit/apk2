@@ -6,8 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.database.ContentObserver
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Telephony
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -29,6 +34,10 @@ class MainActivity : AppCompatActivity() {
 
     private val SMS_PERMISSION_CODE = 100
     private val NOTIFICATION_PERMISSION_CODE = 101
+
+    // ContentObserver to monitor SMS database
+    private var smsObserver: ContentObserver? = null
+    private var lastSmsId = 0L
 
     private val smsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -73,22 +82,35 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+
+        // Register broadcast receiver
         val filter = IntentFilter(SmsReceiver.SMS_RECEIVED_ACTION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(smsReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(smsReceiver, filter)
         }
+
+        // Register ContentObserver to monitor SMS database
+        registerSmsObserver()
+
         // Reload SMS list when app comes back to foreground
         refreshSmsListFromStorage()
     }
 
     override fun onPause() {
         super.onPause()
+
+        // Unregister broadcast receiver
         try {
             unregisterReceiver(smsReceiver)
         } catch (e: Exception) {
             // Receiver was not registered
+        }
+
+        // Unregister ContentObserver
+        smsObserver?.let {
+            contentResolver.unregisterContentObserver(it)
         }
     }
 
@@ -176,6 +198,113 @@ class MainActivity : AppCompatActivity() {
         }
         smsAdapter.notifyDataSetChanged()
         updateStatus()
+    }
+
+    private fun registerSmsObserver() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS)
+            != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        // Get the last SMS ID from database
+        lastSmsId = getLastSmsId()
+
+        smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                checkForNewSms()
+            }
+        }
+
+        // Monitor SMS inbox
+        contentResolver.registerContentObserver(
+            Uri.parse("content://sms/inbox"),
+            true,
+            smsObserver!!
+        )
+    }
+
+    private fun getLastSmsId(): Long {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS)
+            != PackageManager.PERMISSION_GRANTED) {
+            return 0L
+        }
+
+        try {
+            val cursor = contentResolver.query(
+                Uri.parse("content://sms/inbox"),
+                arrayOf("_id"),
+                null,
+                null,
+                "_id DESC LIMIT 1"
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    return it.getLong(it.getColumnIndexOrThrow("_id"))
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return 0L
+    }
+
+    private fun checkForNewSms() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS)
+            != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        try {
+            val cursor = contentResolver.query(
+                Uri.parse("content://sms/inbox"),
+                arrayOf("_id", "address", "body", "date"),
+                "_id > ?",
+                arrayOf(lastSmsId.toString()),
+                "_id ASC"
+            )
+
+            cursor?.use {
+                while (it.moveToNext()) {
+                    val id = it.getLong(it.getColumnIndexOrThrow("_id"))
+                    val address = it.getString(it.getColumnIndexOrThrow("address"))
+                    val body = it.getString(it.getColumnIndexOrThrow("body"))
+                    val timestamp = it.getLong(it.getColumnIndexOrThrow("date"))
+
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    val date = dateFormat.format(Date(timestamp))
+
+                    // Save to storage
+                    saveSmsToStorage(address, body, timestamp)
+
+                    // Update UI
+                    val smsData = SmsData(address, body, date)
+                    smsAdapter.addSms(smsData)
+
+                    lastSmsId = id
+                }
+                updateStatus()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun saveSmsToStorage(sender: String, message: String, timestamp: Long) {
+        val prefs = getSharedPreferences("sms_storage", Context.MODE_PRIVATE)
+        val existingData = prefs.getString("sms_list", "") ?: ""
+
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val date = dateFormat.format(Date(timestamp))
+
+        val newEntry = "$date|$sender|$message\n"
+        val updatedData = newEntry + existingData
+
+        // Keep only last 100 messages
+        val lines = updatedData.split("\n")
+        val limitedData = lines.take(100).joinToString("\n")
+
+        prefs.edit().putString("sms_list", limitedData).apply()
     }
 
     private fun updateStatus() {

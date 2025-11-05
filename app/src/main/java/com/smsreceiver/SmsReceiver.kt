@@ -21,9 +21,15 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
-        if (context == null || intent == null) return
+        Log.d(TAG, "onReceive called! Action: ${intent?.action}")
+
+        if (context == null || intent == null) {
+            Log.e(TAG, "Context or intent is null")
+            return
+        }
 
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+            Log.d(TAG, "SMS_RECEIVED_ACTION detected")
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
 
             // Group messages by sender to handle multi-part SMS
