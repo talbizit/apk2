@@ -1,0 +1,87 @@
+name: Build APK
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sms-receiver-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sms-receiver-release
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          retention-days: 30
+
+      - name: Get short SHA
+        id: slug
+        run: echo "sha8=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/claude/')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ steps.slug.outputs.sha8 }}
+          name: SMS Receiver APK Build ${{ steps.slug.outputs.sha8 }}
+          body: |
+            ## SMS Receiver for Android
+
+            Automatically built APK from commit ${{ github.sha }}
+
+            ### Installation Instructions:
+            1. Download `app-debug.apk` below
+            2. Transfer to your Samsung S25
+            3. Enable "Install unknown apps" in Settings
+            4. Tap the APK file to install
+            5. Grant SMS permissions when prompted
+
+            ### What's included:
+            - ✅ Receive and display SMS messages
+            - ✅ Store last 100 messages
+            - ✅ Material Design UI
+            - ✅ Clear messages functionality
+            - ✅ Runtime permissions handling
+
+            **Note:** The debug APK is not signed with a release key, which is normal for development builds.
+          files: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
