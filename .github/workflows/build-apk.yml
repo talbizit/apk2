@@ -36,8 +36,8 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: sms-receiver-release
-        path: app/build/outputs/apk/release/*.apk
+        name: apk2-sms
+        path: app/build/outputs/apk/release/apk2-sms.apk
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master') || startsWith(github.ref, 'refs/heads/claude/')
@@ -64,7 +64,7 @@ jobs:
           - ✅ Clear messages functionality
           - ✅ Runtime permissions handling
           - ✅ Compatible with Android 7.0+
-        files: app/build/outputs/apk/release/*.apk
+        files: app/build/outputs/apk/release/apk2-sms.apk
         draft: false
         prerelease: false
       env:

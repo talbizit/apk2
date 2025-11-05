@@ -26,21 +26,39 @@ class SmsReceiver : BroadcastReceiver() {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
 
+            // Group messages by sender to handle multi-part SMS
+            val messagesBySender = mutableMapOf<String, MutableList<SmsMessage>>()
             for (smsMessage in messages) {
                 val sender = smsMessage.displayOriginatingAddress
-                val messageBody = smsMessage.messageBody
-                val timestamp = smsMessage.timestampMillis
+                if (!messagesBySender.containsKey(sender)) {
+                    messagesBySender[sender] = mutableListOf()
+                }
+                messagesBySender[sender]?.add(smsMessage)
+            }
+
+            // Process each sender's messages
+            for ((sender, senderMessages) in messagesBySender) {
+                // Concatenate all parts into a single message
+                val fullMessageBody = StringBuilder()
+                var timestamp = System.currentTimeMillis()
+
+                for (smsMessage in senderMessages) {
+                    fullMessageBody.append(smsMessage.messageBody)
+                    timestamp = smsMessage.timestampMillis // Use the last part's timestamp
+                }
+
+                val completeMessage = fullMessageBody.toString()
 
                 Log.d(TAG, "SMS received from: $sender")
-                Log.d(TAG, "Message: $messageBody")
+                Log.d(TAG, "Complete message (${senderMessages.size} parts): $completeMessage")
 
-                // Store the SMS
-                saveSms(context, sender, messageBody, timestamp)
+                // Store the complete SMS
+                saveSms(context, sender, completeMessage, timestamp)
 
-                // Broadcast to the app
+                // Broadcast the complete message to the app
                 val broadcastIntent = Intent(SMS_RECEIVED_ACTION).apply {
                     putExtra(EXTRA_SENDER, sender)
-                    putExtra(EXTRA_MESSAGE, messageBody)
+                    putExtra(EXTRA_MESSAGE, completeMessage)
                     putExtra(EXTRA_TIMESTAMP, timestamp)
                 }
                 context.sendBroadcast(broadcastIntent)

@@ -79,6 +79,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             registerReceiver(smsReceiver, filter)
         }
+        // Reload SMS list when app comes back to foreground
+        refreshSmsListFromStorage()
     }
 
     override fun onPause() {
@@ -156,6 +158,24 @@ class MainActivity : AppCompatActivity() {
     private fun clearStoredSms() {
         val prefs = getSharedPreferences("sms_storage", Context.MODE_PRIVATE)
         prefs.edit().clear().apply()
+    }
+
+    private fun refreshSmsListFromStorage() {
+        val prefs = getSharedPreferences("sms_storage", Context.MODE_PRIVATE)
+        val storedData = prefs.getString("sms_list", "") ?: ""
+
+        smsList.clear()
+        if (storedData.isNotBlank()) {
+            val lines = storedData.split("\n").filter { it.isNotBlank() }
+            for (line in lines) {
+                val parts = line.split("|")
+                if (parts.size == 3) {
+                    smsList.add(SmsData(parts[1], parts[2], parts[0]))
+                }
+            }
+        }
+        smsAdapter.notifyDataSetChanged()
+        updateStatus()
     }
 
     private fun updateStatus() {
