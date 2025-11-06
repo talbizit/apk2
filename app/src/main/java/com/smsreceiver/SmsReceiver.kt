@@ -79,7 +79,13 @@ class SmsReceiver : BroadcastReceiver() {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val date = dateFormat.format(Date(timestamp))
 
-        val newEntry = "$date|$sender|$message\n"
+        // Escape special characters to prevent parsing issues
+        val escapedMessage = message
+            .replace("\\", "\\\\")  // Escape backslashes first
+            .replace("\n", "\\n")    // Escape newlines
+            .replace("|", "\\|")     // Escape pipe delimiter
+
+        val newEntry = "$date|$sender|$escapedMessage\n"
         val updatedData = newEntry + existingData
 
         // Keep only last 100 messages to avoid storage issues

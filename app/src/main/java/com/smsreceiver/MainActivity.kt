@@ -170,7 +170,13 @@ class MainActivity : AppCompatActivity() {
             for (line in lines) {
                 val parts = line.split("|")
                 if (parts.size == 3) {
-                    smsList.add(SmsData(parts[1], parts[2], parts[0]))
+                    // Unescape special characters (must handle \\ first with temp marker)
+                    val unescapedMessage = parts[2]
+                        .replace("\\\\", "\u0001")  // Temp marker for escaped backslash
+                        .replace("\\n", "\n")        // Unescape newlines
+                        .replace("\\|", "|")         // Unescape pipe
+                        .replace("\u0001", "\\")     // Restore backslash
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0]))
                 }
             }
             smsAdapter.notifyDataSetChanged()
@@ -192,7 +198,13 @@ class MainActivity : AppCompatActivity() {
             for (line in lines) {
                 val parts = line.split("|")
                 if (parts.size == 3) {
-                    smsList.add(SmsData(parts[1], parts[2], parts[0]))
+                    // Unescape special characters (must handle \\ first with temp marker)
+                    val unescapedMessage = parts[2]
+                        .replace("\\\\", "\u0001")  // Temp marker for escaped backslash
+                        .replace("\\n", "\n")        // Unescape newlines
+                        .replace("\\|", "|")         // Unescape pipe
+                        .replace("\u0001", "\\")     // Restore backslash
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0]))
                 }
             }
         }
@@ -297,7 +309,13 @@ class MainActivity : AppCompatActivity() {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val date = dateFormat.format(Date(timestamp))
 
-        val newEntry = "$date|$sender|$message\n"
+        // Escape special characters to prevent parsing issues
+        val escapedMessage = message
+            .replace("\\", "\\\\")  // Escape backslashes first
+            .replace("\n", "\\n")    // Escape newlines
+            .replace("|", "\\|")     // Escape pipe delimiter
+
+        val newEntry = "$date|$sender|$escapedMessage\n"
         val updatedData = newEntry + existingData
 
         // Keep only last 100 messages
