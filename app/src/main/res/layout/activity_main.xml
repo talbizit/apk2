@@ -63,9 +63,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?android:attr/colorPrimary"
-        app:tabTextColor="?android:attr/textColorSecondary"
-        app:tabSelectedTextColor="?android:attr/textColorPrimary"
-        app:tabIndicatorColor="?android:attr/colorAccent">
+        app:tabTextColor="#E0E0E0"
+        app:tabSelectedTextColor="#FFFFFF"
+        app:tabIndicatorColor="#FFFFFF">
 
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
