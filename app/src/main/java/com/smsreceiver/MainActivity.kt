@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var clearButton: Button
     private lateinit var deleteButton: Button
+    private lateinit var settingsButton: Button
     private lateinit var tabLayout: TabLayout
     private val smsList = mutableListOf<SmsData>()
 
@@ -85,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         clearButton = findViewById(R.id.clearButton)
         deleteButton = findViewById(R.id.deleteButton)
+        settingsButton = findViewById(R.id.settingsButton)
         tabLayout = findViewById(R.id.tabLayout)
 
         groupedAdapter = GroupedSmsAdapter(
@@ -130,6 +132,11 @@ class MainActivity : AppCompatActivity() {
                 updateStatus()
                 Toast.makeText(this, "${selectedItems.size} message(s) deleted permanently", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        settingsButton.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
         }
 
         checkAndRequestPermissions()
@@ -281,8 +288,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSwipeGesture() {
-        val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
-            private val background = ColorDrawable(Color.parseColor("#4CAF50"))
+        val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT or ItemTouchHelper.LEFT) {
+            private val archiveBackground = ColorDrawable(Color.parseColor("#4CAF50"))
+            private val forwardBackground = ColorDrawable(Color.parseColor("#2196F3"))
             private val textPaint = Paint().apply {
                 color = Color.WHITE
                 textSize = 48f
@@ -302,20 +310,32 @@ class MainActivity : AppCompatActivity() {
 
                 if (item is ListItem.Message) {
                     val sms = item.sms
-                    if (currentTab == 0) {
-                        // Archive the message
-                        sms.isArchived = true
-                        sms.archiveTimestamp = System.currentTimeMillis()
-                        Toast.makeText(this@MainActivity, "Message archived", Toast.LENGTH_SHORT).show()
-                    } else {
-                        // Restore to inbox
-                        sms.isArchived = false
-                        sms.archiveTimestamp = 0L
-                        Toast.makeText(this@MainActivity, "Message restored to inbox", Toast.LENGTH_SHORT).show()
+
+                    when (direction) {
+                        ItemTouchHelper.RIGHT -> {
+                            // Archive/Restore functionality
+                            if (currentTab == 0) {
+                                // Archive the message
+                                sms.isArchived = true
+                                sms.archiveTimestamp = System.currentTimeMillis()
+                                Toast.makeText(this@MainActivity, "Message archived", Toast.LENGTH_SHORT).show()
+                            } else {
+                                // Restore to inbox
+                                sms.isArchived = false
+                                sms.archiveTimestamp = 0L
+                                Toast.makeText(this@MainActivity, "Message restored to inbox", Toast.LENGTH_SHORT).show()
+                            }
+                            saveAllSms()
+                            refreshDisplay()
+                            updateStatus()
+                        }
+                        ItemTouchHelper.LEFT -> {
+                            // Forward functionality
+                            forwardMessage(sms)
+                            // Restore the view since we're not removing the message
+                            groupedAdapter.notifyItemChanged(position)
+                        }
                     }
-                    saveAllSms()
-                    refreshDisplay()
-                    updateStatus()
                 } else {
                     // Can't swipe headers, restore view
                     groupedAdapter.notifyItemChanged(position)
@@ -340,18 +360,35 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (dX > 0) {
-                    // Draw green background
-                    background.setBounds(
+                    // Swipe right - archive/unarchive
+                    archiveBackground.setBounds(
                         itemView.left,
                         itemView.top,
                         itemView.left + dX.toInt(),
                         itemView.bottom
                     )
-                    background.draw(c)
+                    archiveBackground.draw(c)
 
                     // Draw text based on current tab
                     val text = if (currentTab == 0) "Archived" else "Unarchived"
                     val textX = itemView.left.toFloat() + 40f
+                    val textY = itemView.top + (itemView.height / 2f) + (textPaint.textSize / 3f)
+
+                    c.drawText(text, textX, textY, textPaint)
+                } else if (dX < 0) {
+                    // Swipe left - forward
+                    forwardBackground.setBounds(
+                        itemView.right + dX.toInt(),
+                        itemView.top,
+                        itemView.right,
+                        itemView.bottom
+                    )
+                    forwardBackground.draw(c)
+
+                    // Draw text
+                    val text = "Forward"
+                    val textWidth = textPaint.measureText(text)
+                    val textX = itemView.right.toFloat() - textWidth - 40f
                     val textY = itemView.top + (itemView.height / 2f) + (textPaint.textSize / 3f)
 
                     c.drawText(text, textX, textY, textPaint)
@@ -693,6 +730,105 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun forwardMessage(sms: SmsData) {
+        val prefs = getSharedPreferences("forwarding_settings", Context.MODE_PRIVATE)
+
+        val emailEnabled = prefs.getBoolean("email_enabled", true)
+        val emailAddress = prefs.getString("email_address", "tregister@hotmail.com") ?: "tregister@hotmail.com"
+
+        val smsEnabled = prefs.getBoolean("sms_enabled", true)
+        val phoneNumber = prefs.getString("phone_number", "0552316516") ?: "0552316516"
+
+        var successCount = 0
+        var errorMessages = mutableListOf<String>()
+
+        // Forward via email
+        if (emailEnabled && emailAddress.isNotEmpty()) {
+            try {
+                forwardViaEmail(sms, emailAddress)
+                successCount++
+            } catch (e: Exception) {
+                errorMessages.add("Email failed: ${e.message}")
+            }
+        }
+
+        // Forward via SMS
+        if (smsEnabled && phoneNumber.isNotEmpty()) {
+            try {
+                forwardViaSms(sms, phoneNumber)
+                successCount++
+            } catch (e: Exception) {
+                errorMessages.add("SMS failed: ${e.message}")
+            }
+        }
+
+        // Show result
+        if (successCount > 0) {
+            val methods = mutableListOf<String>()
+            if (emailEnabled && emailAddress.isNotEmpty()) methods.add("email")
+            if (smsEnabled && phoneNumber.isNotEmpty()) methods.add("SMS")
+            Toast.makeText(this, "Forwarded via ${methods.joinToString(" and ")}", Toast.LENGTH_SHORT).show()
+        } else if (errorMessages.isNotEmpty()) {
+            Toast.makeText(this, errorMessages.joinToString(", "), Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(this, "No forwarding methods enabled. Check settings.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun forwardViaEmail(sms: SmsData, emailAddress: String) {
+        val subject = "Forwarded SMS from ${sms.sender}"
+        val body = """
+            From: ${sms.sender}
+            Time: ${sms.timestamp}
+
+            Message:
+            ${sms.message}
+        """.trimIndent()
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "message/rfc822"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(emailAddress))
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+        }
+
+        try {
+            startActivity(Intent.createChooser(intent, "Send email via..."))
+        } catch (e: Exception) {
+            // If no email app is available, show a toast
+            throw Exception("No email app available")
+        }
+    }
+
+    private fun forwardViaSms(sms: SmsData, phoneNumber: String) {
+        // Check if we have SMS sending permission
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+            != PackageManager.PERMISSION_GRANTED) {
+            throw Exception("SMS permission not granted")
+        }
+
+        try {
+            val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                getSystemService(android.telephony.SmsManager::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                android.telephony.SmsManager.getDefault()
+            }
+
+            val forwardedMessage = "Fwd from ${sms.sender}: ${sms.message}"
+
+            // Split message if it's too long
+            val parts = smsManager.divideMessage(forwardedMessage)
+            if (parts.size == 1) {
+                smsManager.sendTextMessage(phoneNumber, null, forwardedMessage, null, null)
+            } else {
+                smsManager.sendMultipartTextMessage(phoneNumber, null, parts, null, null)
+            }
+        } catch (e: Exception) {
+            throw Exception("Failed to send SMS: ${e.message}")
+        }
     }
 
     private fun updateStatus() {

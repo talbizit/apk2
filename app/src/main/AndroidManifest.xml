@@ -28,6 +28,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
         <!-- SMS Broadcast Receiver -->
         <receiver
             android:name=".SmsReceiver"
