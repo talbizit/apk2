@@ -765,7 +765,14 @@ class MainActivity : AppCompatActivity() {
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
-                        Toast.makeText(this, "Email failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        val errorMsg = when {
+                            e.message?.contains("535") == true || e.message?.contains("5.7") == true ->
+                                "Email failed: Wrong password. Use App Password from account.microsoft.com → Security → App passwords"
+                            e.message?.contains("Authentication") == true ->
+                                "Email failed: Authentication error. Check your email and App Password in Settings"
+                            else -> "Email failed: ${e.message}"
+                        }
+                        Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
                     }
                 }
             }
