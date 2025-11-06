@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
@@ -111,12 +112,8 @@ class MainActivity : AppCompatActivity() {
 
         clearButton.setOnClickListener {
             if (currentTab == 0) {
-                // Archive all inbox messages
-                smsList.forEach { if (!it.isArchived) it.isArchived = true; it.archiveTimestamp = System.currentTimeMillis() }
-                saveAllSms()
-                refreshDisplay()
-                updateStatus()
-                Toast.makeText(this, "All messages archived", Toast.LENGTH_SHORT).show()
+                // Show confirmation dialog for archiving all messages
+                showArchiveAllConfirmation()
             } else {
                 // Show confirmation dialog for permanent deletion
                 showDeleteArchiveConfirmation()
@@ -286,6 +283,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupSwipeGesture() {
         val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
             private val background = ColorDrawable(Color.parseColor("#4CAF50"))
+            private val textPaint = Paint().apply {
+                color = Color.WHITE
+                textSize = 48f
+                isFakeBoldText = true
+                textAlign = Paint.Align.LEFT
+            }
 
             override fun onMove(
                 recyclerView: RecyclerView,
@@ -337,6 +340,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (dX > 0) {
+                    // Draw green background
                     background.setBounds(
                         itemView.left,
                         itemView.top,
@@ -344,6 +348,13 @@ class MainActivity : AppCompatActivity() {
                         itemView.bottom
                     )
                     background.draw(c)
+
+                    // Draw text based on current tab
+                    val text = if (currentTab == 0) "Archived" else "Unarchived"
+                    val textX = itemView.left.toFloat() + 40f
+                    val textY = itemView.top + (itemView.height / 2f) + (textPaint.textSize / 3f)
+
+                    c.drawText(text, textX, textY, textPaint)
                 }
 
                 super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
@@ -607,6 +618,29 @@ class MainActivity : AppCompatActivity() {
         } else {
             "Clear Archive"
         }
+    }
+
+    private fun showArchiveAllConfirmation() {
+        val inboxCount = smsList.count { !it.isArchived }
+
+        if (inboxCount == 0) {
+            Toast.makeText(this, "Inbox is already empty", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Archive All Messages")
+            .setMessage("Archive all $inboxCount message(s) from Inbox?\n\nYou can restore them from the Archive tab later.")
+            .setPositiveButton("Archive All") { _, _ ->
+                // Archive all inbox messages
+                smsList.forEach { if (!it.isArchived) it.isArchived = true; it.archiveTimestamp = System.currentTimeMillis() }
+                saveAllSms()
+                refreshDisplay()
+                updateStatus()
+                Toast.makeText(this, "All messages archived", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showDeleteArchiveConfirmation() {
