@@ -97,6 +97,7 @@ class MainActivity : AppCompatActivity() {
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 currentTab = tab?.position ?: 0
+                updateClearButtonText()
                 refreshDisplay()
             }
 
@@ -106,7 +107,7 @@ class MainActivity : AppCompatActivity() {
 
         clearButton.setOnClickListener {
             if (currentTab == 0) {
-                // Clear inbox
+                // Archive all inbox messages
                 smsList.forEach { if (!it.isArchived) it.isArchived = true; it.archiveTimestamp = System.currentTimeMillis() }
             } else {
                 // Delete archived permanently
@@ -115,7 +116,7 @@ class MainActivity : AppCompatActivity() {
             saveAllSms()
             refreshDisplay()
             updateStatus()
-            Toast.makeText(this, if (currentTab == 0) "Inbox archived" else "Archive cleared", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, if (currentTab == 0) "All messages archived" else "Archive cleared", Toast.LENGTH_SHORT).show()
         }
 
         deleteButton.setOnClickListener {
@@ -131,6 +132,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkAndRequestPermissions()
+        updateClearButtonText()
         loadStoredSms()
         refreshDisplay()
         updateStatus()
@@ -592,6 +594,14 @@ class MainActivity : AppCompatActivity() {
             updateStatus()
         } else {
             super.onBackPressed()
+        }
+    }
+
+    private fun updateClearButtonText() {
+        clearButton.text = if (currentTab == 0) {
+            "Archive All Messages"
+        } else {
+            "Clear Archive"
         }
     }
 
