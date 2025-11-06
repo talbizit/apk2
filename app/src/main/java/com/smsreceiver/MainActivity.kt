@@ -7,6 +7,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.database.ContentObserver
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -19,17 +22,21 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.tabs.TabLayout
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var recyclerView: RecyclerView
-    private lateinit var smsAdapter: SmsAdapter
+    private lateinit var groupedAdapter: GroupedSmsAdapter
     private lateinit var statusText: TextView
     private lateinit var clearButton: Button
+    private lateinit var tabLayout: TabLayout
     private val smsList = mutableListOf<SmsData>()
 
     private val SMS_PERMISSION_CODE = 100
@@ -38,6 +45,9 @@ class MainActivity : AppCompatActivity() {
     // ContentObserver to monitor SMS database
     private var smsObserver: ContentObserver? = null
     private var lastSmsId = 0L
+
+    // Track current tab (0 = Inbox, 1 = Archive)
+    private var currentTab = 0
 
     private val smsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -49,8 +59,9 @@ class MainActivity : AppCompatActivity() {
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                 val date = dateFormat.format(Date(timestamp))
 
-                val smsData = SmsData(sender, message, date)
-                smsAdapter.addSms(smsData)
+                val smsData = SmsData(sender, message, date, timestamp, isArchived = false)
+                smsList.add(0, smsData)
+                refreshDisplay()
                 updateStatus()
             }
         }
@@ -63,20 +74,43 @@ class MainActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recyclerView)
         statusText = findViewById(R.id.statusText)
         clearButton = findViewById(R.id.clearButton)
+        tabLayout = findViewById(R.id.tabLayout)
 
-        smsAdapter = SmsAdapter(smsList)
+        groupedAdapter = GroupedSmsAdapter(mutableListOf())
         recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = smsAdapter
+        recyclerView.adapter = groupedAdapter
+
+        // Setup swipe to archive/restore
+        setupSwipeGesture()
+
+        // Setup tab switching
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                currentTab = tab?.position ?: 0
+                refreshDisplay()
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
 
         clearButton.setOnClickListener {
-            smsAdapter.clearAll()
-            clearStoredSms()
+            if (currentTab == 0) {
+                // Clear inbox
+                smsList.forEach { if (!it.isArchived) it.isArchived = true; it.archiveTimestamp = System.currentTimeMillis() }
+            } else {
+                // Delete archived permanently
+                smsList.removeAll { it.isArchived }
+            }
+            saveAllSms()
+            refreshDisplay()
             updateStatus()
-            Toast.makeText(this, "Messages cleared", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, if (currentTab == 0) "Inbox archived" else "Archive cleared", Toast.LENGTH_SHORT).show()
         }
 
         checkAndRequestPermissions()
         loadStoredSms()
+        refreshDisplay()
         updateStatus()
     }
 
@@ -169,17 +203,21 @@ class MainActivity : AppCompatActivity() {
             val lines = storedData.split("\n").filter { it.isNotBlank() }
             for (line in lines) {
                 val parts = line.split("|")
-                if (parts.size == 3) {
-                    // Unescape special characters (must handle \\ first with temp marker)
+                if (parts.size >= 3) {
+                    // Unescape special characters
                     val unescapedMessage = parts[2]
-                        .replace("\\\\", "\u0001")  // Temp marker for escaped backslash
-                        .replace("\\n", "\n")        // Unescape newlines
-                        .replace("\\|", "|")         // Unescape pipe
-                        .replace("\u0001", "\\")     // Restore backslash
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0]))
+                        .replace("\\\\", "\u0001")
+                        .replace("\\n", "\n")
+                        .replace("\\|", "|")
+                        .replace("\u0001", "\\")
+
+                    val isArchived = if (parts.size > 3) parts[3] == "1" else false
+                    val archiveTimestamp = if (parts.size > 4) parts[4].toLongOrNull() ?: 0L else 0L
+                    val timestampMillis = if (parts.size > 5) parts[5].toLongOrNull() ?: 0L else 0L
+
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, isArchived, archiveTimestamp))
                 }
             }
-            smsAdapter.notifyDataSetChanged()
         }
     }
 
@@ -197,19 +235,169 @@ class MainActivity : AppCompatActivity() {
             val lines = storedData.split("\n").filter { it.isNotBlank() }
             for (line in lines) {
                 val parts = line.split("|")
-                if (parts.size == 3) {
-                    // Unescape special characters (must handle \\ first with temp marker)
+                if (parts.size >= 3) {
+                    // Unescape special characters
                     val unescapedMessage = parts[2]
-                        .replace("\\\\", "\u0001")  // Temp marker for escaped backslash
-                        .replace("\\n", "\n")        // Unescape newlines
-                        .replace("\\|", "|")         // Unescape pipe
-                        .replace("\u0001", "\\")     // Restore backslash
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0]))
+                        .replace("\\\\", "\u0001")
+                        .replace("\\n", "\n")
+                        .replace("\\|", "|")
+                        .replace("\u0001", "\\")
+
+                    val isArchived = if (parts.size > 3) parts[3] == "1" else false
+                    val archiveTimestamp = if (parts.size > 4) parts[4].toLongOrNull() ?: 0L else 0L
+                    val timestampMillis = if (parts.size > 5) parts[5].toLongOrNull() ?: 0L else 0L
+
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, isArchived, archiveTimestamp))
                 }
             }
         }
-        smsAdapter.notifyDataSetChanged()
+        refreshDisplay()
         updateStatus()
+    }
+
+    private fun setupSwipeGesture() {
+        val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
+            private val background = ColorDrawable(Color.parseColor("#4CAF50"))
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean = false
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.adapterPosition
+                val item = groupedAdapter.getItemAtPosition(position)
+
+                if (item is ListItem.Message) {
+                    val sms = item.sms
+                    if (currentTab == 0) {
+                        // Archive the message
+                        sms.isArchived = true
+                        sms.archiveTimestamp = System.currentTimeMillis()
+                        Toast.makeText(this@MainActivity, "Message archived", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Restore to inbox
+                        sms.isArchived = false
+                        sms.archiveTimestamp = 0L
+                        Toast.makeText(this@MainActivity, "Message restored to inbox", Toast.LENGTH_SHORT).show()
+                    }
+                    saveAllSms()
+                    refreshDisplay()
+                    updateStatus()
+                } else {
+                    // Can't swipe headers, restore view
+                    groupedAdapter.notifyItemChanged(position)
+                }
+            }
+
+            override fun onChildDraw(
+                c: Canvas,
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                dX: Float,
+                dY: Float,
+                actionState: Int,
+                isCurrentlyActive: Boolean
+            ) {
+                val itemView = viewHolder.itemView
+
+                // Only allow swiping messages, not headers
+                val item = groupedAdapter.getItemAtPosition(viewHolder.adapterPosition)
+                if (item !is ListItem.Message) {
+                    return
+                }
+
+                if (dX > 0) {
+                    background.setBounds(
+                        itemView.left,
+                        itemView.top,
+                        itemView.left + dX.toInt(),
+                        itemView.bottom
+                    )
+                    background.draw(c)
+                }
+
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
+            }
+        }
+
+        val itemTouchHelper = ItemTouchHelper(swipeHandler)
+        itemTouchHelper.attachToRecyclerView(recyclerView)
+    }
+
+    private fun refreshDisplay() {
+        val items = if (currentTab == 0) {
+            groupByInbox()
+        } else {
+            groupByArchive()
+        }
+        groupedAdapter.updateItems(items)
+    }
+
+    private fun groupByInbox(): List<ListItem> {
+        val inboxMessages = smsList.filter { !it.isArchived }
+        return groupBySender(inboxMessages)
+    }
+
+    private fun groupByArchive(): List<ListItem> {
+        val archivedMessages = smsList.filter { it.isArchived }
+        return groupByTimeCategories(archivedMessages)
+    }
+
+    private fun groupBySender(messages: List<SmsData>): List<ListItem> {
+        val result = mutableListOf<ListItem>()
+        val grouped = messages.groupBy { it.sender }
+
+        for ((sender, senderMessages) in grouped) {
+            result.add(ListItem.Header(sender))
+            senderMessages.forEach { result.add(ListItem.Message(it)) }
+        }
+
+        return result
+    }
+
+    private fun groupByTimeCategories(messages: List<SmsData>): List<ListItem> {
+        val result = mutableListOf<ListItem>()
+        val now = System.currentTimeMillis()
+
+        val categories = mapOf(
+            "Last 7 Days" to messages.filter { daysSince(it.archiveTimestamp, now) <= 7 },
+            "Last Month" to messages.filter { daysSince(it.archiveTimestamp, now) in 8..30 },
+            "Last Quarter" to messages.filter { daysSince(it.archiveTimestamp, now) in 31..90 },
+            "Last Year" to messages.filter { daysSince(it.archiveTimestamp, now) in 91..365 },
+            "Older" to messages.filter { daysSince(it.archiveTimestamp, now) > 365 }
+        )
+
+        for ((category, categoryMessages) in categories) {
+            if (categoryMessages.isNotEmpty()) {
+                result.add(ListItem.Header(category))
+                // Group by sender within each time category
+                val senderGroups = categoryMessages.groupBy { it.sender }
+                for ((sender, senderMessages) in senderGroups) {
+                    result.add(ListItem.Header("  $sender"))
+                    senderMessages.forEach { result.add(ListItem.Message(it)) }
+                }
+            }
+        }
+
+        return result
+    }
+
+    private fun daysSince(timestamp: Long, now: Long): Long {
+        return TimeUnit.MILLISECONDS.toDays(now - timestamp)
+    }
+
+    private fun saveAllSms() {
+        val prefs = getSharedPreferences("sms_storage", Context.MODE_PRIVATE)
+        val lines = smsList.map { sms ->
+            val escapedMessage = sms.message
+                .replace("\\", "\\\\")
+                .replace("\n", "\\n")
+                .replace("|", "\\|")
+            "${sms.timestamp}|${sms.sender}|$escapedMessage|${if (sms.isArchived) "1" else "0"}|${sms.archiveTimestamp}|${sms.timestampMillis}"
+        }
+        prefs.edit().putString("sms_list", lines.joinToString("\n")).apply()
     }
 
     private fun registerSmsObserver() {
@@ -286,15 +474,14 @@ class MainActivity : AppCompatActivity() {
                     val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                     val date = dateFormat.format(Date(timestamp))
 
-                    // Save to storage
-                    saveSmsToStorage(address, body, timestamp)
-
                     // Update UI
-                    val smsData = SmsData(address, body, date)
-                    smsAdapter.addSms(smsData)
+                    val smsData = SmsData(address, body, date, timestamp, isArchived = false)
+                    smsList.add(0, smsData)
 
                     lastSmsId = id
                 }
+                saveAllSms()
+                refreshDisplay()
                 updateStatus()
             }
         } catch (e: Exception) {
@@ -302,37 +489,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveSmsToStorage(sender: String, message: String, timestamp: Long) {
-        val prefs = getSharedPreferences("sms_storage", Context.MODE_PRIVATE)
-        val existingData = prefs.getString("sms_list", "") ?: ""
-
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-        val date = dateFormat.format(Date(timestamp))
-
-        // Escape special characters to prevent parsing issues
-        val escapedMessage = message
-            .replace("\\", "\\\\")  // Escape backslashes first
-            .replace("\n", "\\n")    // Escape newlines
-            .replace("|", "\\|")     // Escape pipe delimiter
-
-        val newEntry = "$date|$sender|$escapedMessage\n"
-        val updatedData = newEntry + existingData
-
-        // Keep only last 100 messages
-        val lines = updatedData.split("\n")
-        val limitedData = lines.take(100).joinToString("\n")
-
-        prefs.edit().putString("sms_list", limitedData).apply()
-    }
-
     private fun updateStatus() {
         val hasPermissions = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-        val count = smsAdapter.itemCount
+        val inboxCount = smsList.count { !it.isArchived }
+        val archiveCount = smsList.count { it.isArchived }
 
         statusText.text = if (hasPermissions) {
-            "✓ SMS Receiver Active\nMessages received: $count"
+            "✓ SMS Receiver Active\nInbox: $inboxCount | Archive: $archiveCount"
         } else {
-            "⚠ Permissions needed\nMessages received: $count"
+            "⚠ Permissions needed\nInbox: $inboxCount | Archive: $archiveCount"
         }
     }
 }
