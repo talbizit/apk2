@@ -35,6 +35,10 @@ import com.google.android.material.tabs.TabLayout
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+import javax.mail.*
+import javax.mail.internet.*
+import java.util.Properties
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
 
@@ -735,70 +739,90 @@ class MainActivity : AppCompatActivity() {
     private fun forwardMessage(sms: SmsData) {
         val prefs = getSharedPreferences("forwarding_settings", Context.MODE_PRIVATE)
 
-        val emailEnabled = prefs.getBoolean("email_enabled", true)
+        val emailEnabled = prefs.getBoolean("email_enabled", false)
         val emailAddress = prefs.getString("email_address", "tregister@hotmail.com") ?: "tregister@hotmail.com"
+        val senderEmail = prefs.getString("sender_email", "") ?: ""
+        val emailPassword = prefs.getString("email_password", "") ?: ""
 
-        val smsEnabled = prefs.getBoolean("sms_enabled", true)
+        val smsEnabled = prefs.getBoolean("sms_enabled", false)
         val phoneNumber = prefs.getString("phone_number", "0552316516") ?: "0552316516"
 
-        var successCount = 0
-        var errorMessages = mutableListOf<String>()
+        var forwardingCount = 0
 
-        // Forward via email
-        if (emailEnabled && emailAddress.isNotEmpty()) {
-            try {
-                forwardViaEmail(sms, emailAddress)
-                successCount++
-            } catch (e: Exception) {
-                errorMessages.add("Email failed: ${e.message}")
+        // Forward via email (in background thread)
+        if (emailEnabled && emailAddress.isNotEmpty() && senderEmail.isNotEmpty() && emailPassword.isNotEmpty()) {
+            forwardingCount++
+            thread {
+                try {
+                    forwardViaEmail(sms, emailAddress, senderEmail, emailPassword)
+                    runOnUiThread {
+                        Toast.makeText(this, "Email sent to $emailAddress", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        Toast.makeText(this, "Email failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
 
         // Forward via SMS
         if (smsEnabled && phoneNumber.isNotEmpty()) {
+            forwardingCount++
             try {
                 forwardViaSms(sms, phoneNumber)
-                successCount++
+                Toast.makeText(this, "SMS sent to $phoneNumber", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                errorMessages.add("SMS failed: ${e.message}")
+                Toast.makeText(this, "SMS failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
 
-        // Show result
-        if (successCount > 0) {
-            val methods = mutableListOf<String>()
-            if (emailEnabled && emailAddress.isNotEmpty()) methods.add("email")
-            if (smsEnabled && phoneNumber.isNotEmpty()) methods.add("SMS")
-            Toast.makeText(this, "Forwarded via ${methods.joinToString(" and ")}", Toast.LENGTH_SHORT).show()
-        } else if (errorMessages.isNotEmpty()) {
-            Toast.makeText(this, errorMessages.joinToString(", "), Toast.LENGTH_LONG).show()
-        } else {
-            Toast.makeText(this, "No forwarding methods enabled. Check settings.", Toast.LENGTH_SHORT).show()
+        if (forwardingCount == 0) {
+            Toast.makeText(this, "Configure forwarding in settings first", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun forwardViaEmail(sms: SmsData, emailAddress: String) {
-        val subject = "Forwarded SMS from ${sms.sender}"
-        val body = """
-            From: ${sms.sender}
-            Time: ${sms.timestamp}
-
-            Message:
-            ${sms.message}
-        """.trimIndent()
-
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "message/rfc822"
-            putExtra(Intent.EXTRA_EMAIL, arrayOf(emailAddress))
-            putExtra(Intent.EXTRA_SUBJECT, subject)
-            putExtra(Intent.EXTRA_TEXT, body)
+    private fun forwardViaEmail(sms: SmsData, toEmail: String, fromEmail: String, password: String) {
+        // Determine SMTP settings based on sender email domain
+        val (smtpHost, smtpPort) = when {
+            fromEmail.endsWith("@gmail.com") -> Pair("smtp.gmail.com", "587")
+            fromEmail.endsWith("@hotmail.com") || fromEmail.endsWith("@outlook.com") || fromEmail.endsWith("@live.com") ->
+                Pair("smtp.office365.com", "587")
+            fromEmail.endsWith("@yahoo.com") -> Pair("smtp.mail.yahoo.com", "587")
+            else -> Pair("smtp.gmail.com", "587") // default
         }
 
+        val props = Properties().apply {
+            put("mail.smtp.auth", "true")
+            put("mail.smtp.starttls.enable", "true")
+            put("mail.smtp.host", smtpHost)
+            put("mail.smtp.port", smtpPort)
+            put("mail.smtp.ssl.trust", smtpHost)
+        }
+
+        val session = Session.getInstance(props, object : Authenticator() {
+            override fun getPasswordAuthentication(): PasswordAuthentication {
+                return PasswordAuthentication(fromEmail, password)
+            }
+        })
+
         try {
-            startActivity(Intent.createChooser(intent, "Send email via..."))
+            val message = MimeMessage(session).apply {
+                setFrom(InternetAddress(fromEmail))
+                setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail))
+                subject = "Forwarded SMS from ${sms.sender}"
+                setText("""
+                    From: ${sms.sender}
+                    Time: ${sms.timestamp}
+
+                    Message:
+                    ${sms.message}
+                """.trimIndent())
+            }
+
+            Transport.send(message)
         } catch (e: Exception) {
-            // If no email app is available, show a toast
-            throw Exception("No email app available")
+            throw Exception("Failed to send email: ${e.message}")
         }
     }
 

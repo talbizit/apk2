@@ -12,6 +12,8 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var emailToggle: SwitchMaterial
     private lateinit var emailInput: TextInputEditText
+    private lateinit var senderEmailInput: TextInputEditText
+    private lateinit var emailPasswordInput: TextInputEditText
     private lateinit var smsToggle: SwitchMaterial
     private lateinit var phoneInput: TextInputEditText
     private lateinit var saveButton: Button
@@ -27,6 +29,8 @@ class SettingsActivity : AppCompatActivity() {
         // Initialize views
         emailToggle = findViewById(R.id.emailToggle)
         emailInput = findViewById(R.id.emailInput)
+        senderEmailInput = findViewById(R.id.senderEmailInput)
+        emailPasswordInput = findViewById(R.id.emailPasswordInput)
         smsToggle = findViewById(R.id.smsToggle)
         phoneInput = findViewById(R.id.phoneInput)
         saveButton = findViewById(R.id.saveButton)
@@ -45,6 +49,8 @@ class SettingsActivity : AppCompatActivity() {
 
         emailToggle.isChecked = prefs.getBoolean("email_enabled", true)
         emailInput.setText(prefs.getString("email_address", "tregister@hotmail.com"))
+        senderEmailInput.setText(prefs.getString("sender_email", ""))
+        emailPasswordInput.setText(prefs.getString("email_password", ""))
 
         smsToggle.isChecked = prefs.getBoolean("sms_enabled", true)
         phoneInput.setText(prefs.getString("phone_number", "0552316516"))
@@ -52,11 +58,23 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun saveSettings() {
         val email = emailInput.text.toString().trim()
+        val senderEmail = senderEmailInput.text.toString().trim()
+        val emailPassword = emailPasswordInput.text.toString()
         val phone = phoneInput.text.toString().trim()
 
         // Basic validation
         if (emailToggle.isChecked && email.isEmpty()) {
-            Toast.makeText(this, "Please enter an email address", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Please enter a forward-to email address", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (emailToggle.isChecked && senderEmail.isEmpty()) {
+            Toast.makeText(this, "Please enter your sender email address", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (emailToggle.isChecked && emailPassword.isEmpty()) {
+            Toast.makeText(this, "Please enter your email password", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -70,6 +88,8 @@ class SettingsActivity : AppCompatActivity() {
         prefs.edit().apply {
             putBoolean("email_enabled", emailToggle.isChecked)
             putString("email_address", email)
+            putString("sender_email", senderEmail)
+            putString("email_password", emailPassword)
             putBoolean("sms_enabled", smsToggle.isChecked)
             putString("phone_number", phone)
             apply()
