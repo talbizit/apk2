@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var groupedAdapter: GroupedSmsAdapter
     private lateinit var statusText: TextView
     private lateinit var clearButton: Button
+    private lateinit var deleteButton: Button
     private lateinit var tabLayout: TabLayout
     private val smsList = mutableListOf<SmsData>()
 
@@ -48,6 +49,9 @@ class MainActivity : AppCompatActivity() {
 
     // Track current tab (0 = Inbox, 1 = Archive)
     private var currentTab = 0
+
+    // Selection mode tracking
+    private var isSelectionMode = false
 
     private val smsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -74,9 +78,14 @@ class MainActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recyclerView)
         statusText = findViewById(R.id.statusText)
         clearButton = findViewById(R.id.clearButton)
+        deleteButton = findViewById(R.id.deleteButton)
         tabLayout = findViewById(R.id.tabLayout)
 
-        groupedAdapter = GroupedSmsAdapter(mutableListOf())
+        groupedAdapter = GroupedSmsAdapter(
+            items = mutableListOf(),
+            onItemClick = { position -> handleItemClick(position) },
+            onItemLongClick = { position -> handleItemLongClick(position) }
+        )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = groupedAdapter
 
@@ -106,6 +115,18 @@ class MainActivity : AppCompatActivity() {
             refreshDisplay()
             updateStatus()
             Toast.makeText(this, if (currentTab == 0) "Inbox archived" else "Archive cleared", Toast.LENGTH_SHORT).show()
+        }
+
+        deleteButton.setOnClickListener {
+            val selectedItems = groupedAdapter.getSelectedItems()
+            if (selectedItems.isNotEmpty()) {
+                smsList.removeAll { sms -> selectedItems.any { it.sender == sms.sender && it.message == sms.message && it.timestamp == sms.timestamp } }
+                saveAllSms()
+                exitSelectionMode()
+                refreshDisplay()
+                updateStatus()
+                Toast.makeText(this, "${selectedItems.size} message(s) deleted permanently", Toast.LENGTH_SHORT).show()
+            }
         }
 
         checkAndRequestPermissions()
@@ -486,6 +507,90 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun handleItemClick(position: Int) {
+        if (!isSelectionMode) return
+
+        val item = groupedAdapter.getItemAtPosition(position)
+        when (item) {
+            is ListItem.Header -> {
+                // Select/deselect all messages in this group
+                selectGroupItems(position, item.isSelected)
+            }
+            is ListItem.Message -> {
+                // Individual message selection handled in adapter
+            }
+            null -> {}
+        }
+        updateSelectionCount()
+    }
+
+    private fun handleItemLongClick(position: Int): Boolean {
+        if (!isSelectionMode && currentTab == 1) { // Only in Archive tab
+            enterSelectionMode()
+            val item = groupedAdapter.getItemAtPosition(position)
+            when (item) {
+                is ListItem.Header -> {
+                    item.isSelected = true
+                    selectGroupItems(position, true)
+                }
+                is ListItem.Message -> {
+                    item.isSelected = true
+                }
+                null -> {}
+            }
+            groupedAdapter.notifyDataSetChanged()
+            updateSelectionCount()
+            return true
+        }
+        return false
+    }
+
+    private fun selectGroupItems(headerPosition: Int, isSelected: Boolean) {
+        // Find all messages under this header until the next header
+        var pos = headerPosition + 1
+        while (pos < groupedAdapter.itemCount) {
+            val nextItem = groupedAdapter.getItemAtPosition(pos)
+            when (nextItem) {
+                is ListItem.Header -> break // Stop at next header
+                is ListItem.Message -> {
+                    nextItem.isSelected = isSelected
+                    pos++
+                }
+                null -> break
+            }
+        }
+        groupedAdapter.notifyDataSetChanged()
+    }
+
+    private fun enterSelectionMode() {
+        isSelectionMode = true
+        groupedAdapter.isSelectionMode = true
+        deleteButton.visibility = View.VISIBLE
+        clearButton.visibility = View.GONE
+    }
+
+    private fun exitSelectionMode() {
+        isSelectionMode = false
+        groupedAdapter.isSelectionMode = false
+        groupedAdapter.clearSelections()
+        deleteButton.visibility = View.GONE
+        clearButton.visibility = View.VISIBLE
+    }
+
+    private fun updateSelectionCount() {
+        val count = groupedAdapter.getSelectedCount()
+        statusText.text = "Selected: $count message(s)"
+    }
+
+    override fun onBackPressed() {
+        if (isSelectionMode) {
+            exitSelectionMode()
+            updateStatus()
+        } else {
+            super.onBackPressed()
         }
     }
 

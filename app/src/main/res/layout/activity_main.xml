@@ -32,11 +32,29 @@
             android:gravity="center"
             android:paddingBottom="8dp" />
 
-        <Button
-            android:id="@+id/clearButton"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Clear All Messages" />
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/clearButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Clear All Messages"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/deleteButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Delete Selected"
+                android:visibility="gone"
+                android:backgroundTint="#F44336" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
