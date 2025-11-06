@@ -16,10 +16,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -109,14 +113,14 @@ class MainActivity : AppCompatActivity() {
             if (currentTab == 0) {
                 // Archive all inbox messages
                 smsList.forEach { if (!it.isArchived) it.isArchived = true; it.archiveTimestamp = System.currentTimeMillis() }
+                saveAllSms()
+                refreshDisplay()
+                updateStatus()
+                Toast.makeText(this, "All messages archived", Toast.LENGTH_SHORT).show()
             } else {
-                // Delete archived permanently
-                smsList.removeAll { it.isArchived }
+                // Show confirmation dialog for permanent deletion
+                showDeleteArchiveConfirmation()
             }
-            saveAllSms()
-            refreshDisplay()
-            updateStatus()
-            Toast.makeText(this, if (currentTab == 0) "All messages archived" else "Archive cleared", Toast.LENGTH_SHORT).show()
         }
 
         deleteButton.setOnClickListener {
@@ -603,6 +607,58 @@ class MainActivity : AppCompatActivity() {
         } else {
             "Clear Archive"
         }
+    }
+
+    private fun showDeleteArchiveConfirmation() {
+        val archiveCount = smsList.count { it.isArchived }
+
+        if (archiveCount == 0) {
+            Toast.makeText(this, "Archive is already empty", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val dialogView = layoutInflater.inflate(android.R.layout.select_dialog_item, null)
+        val input = EditText(this).apply {
+            hint = "Type DELETE to confirm"
+            setPadding(50, 40, 50, 40)
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("⚠️ Permanently Delete Archive")
+            .setMessage("This will permanently delete $archiveCount archived message(s).\n\nThis action CANNOT be undone!\n\nType DELETE in capital letters to confirm:")
+            .setView(input)
+            .setPositiveButton("DELETE") { _, _ ->
+                // This will be enabled/disabled by the TextWatcher
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.setOnShowListener {
+            val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            positiveButton.isEnabled = false
+
+            input.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    val isValid = s.toString() == "DELETE"
+                    positiveButton.isEnabled = isValid
+                    positiveButton.alpha = if (isValid) 1.0f else 0.5f
+                }
+            })
+
+            positiveButton.setOnClickListener {
+                // Perform the deletion
+                smsList.removeAll { it.isArchived }
+                saveAllSms()
+                refreshDisplay()
+                updateStatus()
+                Toast.makeText(this, "Archive cleared permanently", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
     }
 
     private fun updateStatus() {
