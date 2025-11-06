@@ -62,10 +62,10 @@
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?android:attr/colorPrimary"
-        app:tabTextColor="#E0E0E0"
+        android:background="#212121"
+        app:tabTextColor="#B0B0B0"
         app:tabSelectedTextColor="#FFFFFF"
-        app:tabIndicatorColor="#FFFFFF">
+        app:tabIndicatorColor="#4CAF50">
 
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
