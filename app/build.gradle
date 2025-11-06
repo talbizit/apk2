@@ -43,6 +43,12 @@ android {
         viewBinding true
     }
 
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md', 'META-INF/NOTICE', 'META-INF/LICENSE']
+        }
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             outputFileName = "apk2-sms.apk"
