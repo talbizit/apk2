@@ -4,6 +4,48 @@
 
 This document describes our comprehensive testing approach to prevent regressions and ensure code quality.
 
+## Understanding Test Types (Test Pyramid)
+
+Different types of tests catch different types of bugs:
+
+### **1. Unit Tests** ⚡ (What we have now)
+- **Speed:** Very fast (milliseconds)
+- **Scope:** Pure Kotlin logic, data transformations, calculations
+- **Environment:** JVM only (no Android framework)
+- **Catches:** Logic bugs, calculation errors, data integrity issues
+- **Misses:** Import errors, Android framework bugs, UI issues
+- **Example:** Testing storage format escaping/unescaping
+
+### **2. Compilation** ⚡ (Runs in CI)
+- **Speed:** Fast (seconds)
+- **Scope:** Syntax, imports, type checking
+- **Environment:** Build system
+- **Catches:** Missing imports ✅, syntax errors, type mismatches
+- **Misses:** Runtime bugs, logic errors
+- **Example:** Catches `Unresolved reference: View`
+
+### **3. Integration Tests** 🐌 (Future)
+- **Speed:** Slower (seconds to minutes)
+- **Scope:** Android components working together
+- **Environment:** Android emulator/device
+- **Catches:** Activity lifecycle bugs, Service communication issues
+- **Misses:** Full user flows
+- **Example:** Testing SMS receiver actually receives SMS
+
+### **4. UI Tests** 🐌 (Future)
+- **Speed:** Slow (minutes)
+- **Scope:** Full user interactions
+- **Environment:** Real Android device/emulator
+- **Catches:** UI bugs, user flow issues, visual regressions
+- **Misses:** Edge cases not explicitly tested
+- **Example:** Testing swipe gesture to archive
+
+**Current Setup:**
+- ✅ Unit Tests (50+ tests)
+- ✅ Compilation (in CI)
+- ⏳ Integration Tests (planned)
+- ⏳ UI Tests (planned)
+
 ## Test Coverage
 
 ### 1. SmsDataTest (8 tests)
@@ -105,6 +147,32 @@ Tests run automatically on:
 - Manual workflow dispatch
 
 **Build fails if any test fails** ❌
+
+### Pre-Push Hook (Recommended for Local Development)
+
+Catch errors BEFORE pushing to CI:
+
+```bash
+# Install Git pre-push hook (one-time setup)
+./scripts/install-git-hooks.sh
+```
+
+**What it does:**
+1. Runs unit tests before each push
+2. Checks compilation (catches missing imports!)
+3. Prevents push if anything fails
+4. Saves CI time and catches errors immediately
+
+**Benefits:**
+- ✅ Catch import errors locally (like missing `View` import)
+- ✅ Faster feedback (don't wait for CI)
+- ✅ Save CI resources
+- ✅ Prevent broken commits from reaching remote
+
+**To skip (not recommended):**
+```bash
+git push --no-verify
+```
 
 ## Test Reports
 
