@@ -96,7 +96,8 @@ class MainActivity : AppCompatActivity() {
         groupedAdapter = GroupedSmsAdapter(
             items = mutableListOf(),
             onItemClick = { position -> handleItemClick(position) },
-            onItemLongClick = { position -> handleItemLongClick(position) }
+            onItemLongClick = { position -> handleItemLongClick(position) },
+            onRefreshNeeded = { refreshDisplay() }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = groupedAdapter

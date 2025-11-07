@@ -16,7 +16,8 @@ sealed class ListItem {
 class GroupedSmsAdapter(
     private val items: MutableList<ListItem>,
     private val onItemClick: (Int) -> Unit,
-    private val onItemLongClick: (Int) -> Boolean
+    private val onItemLongClick: (Int) -> Boolean,
+    private val onRefreshNeeded: () -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -172,20 +173,20 @@ class GroupedSmsAdapter(
         // Toggle the collapse state
         headerItem.isCollapsed = !headerItem.isCollapsed
 
-        // Find all child messages under this header
-        val childPositions = mutableListOf<Int>()
-        var pos = headerPosition + 1
-        while (pos < items.size) {
-            when (items[pos]) {
-                is ListItem.Header -> break // Stop at next header
-                is ListItem.Message -> {
-                    childPositions.add(pos)
-                    pos++
+        if (headerItem.isCollapsed) {
+            // Find all child messages under this header and remove them
+            val childPositions = mutableListOf<Int>()
+            var pos = headerPosition + 1
+            while (pos < items.size) {
+                when (items[pos]) {
+                    is ListItem.Header -> break // Stop at next header
+                    is ListItem.Message -> {
+                        childPositions.add(pos)
+                        pos++
+                    }
                 }
             }
-        }
 
-        if (headerItem.isCollapsed) {
             // Remove child messages from display
             childPositions.reversed().forEach { position ->
                 items.removeAt(position)
@@ -193,9 +194,9 @@ class GroupedSmsAdapter(
             notifyItemChanged(headerPosition) // Update icon
             notifyItemRangeRemoved(headerPosition + 1, childPositions.size)
         } else {
-            // This shouldn't happen in normal flow since we removed items
-            // We need to restore items - this is handled by refreshDisplay in MainActivity
-            notifyItemChanged(headerPosition)
+            // Expanding - need to restore items from original data
+            notifyItemChanged(headerPosition) // Update icon first
+            onRefreshNeeded() // Request MainActivity to refresh with expanded state
         }
     }
 
