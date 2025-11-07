@@ -1,5 +1,6 @@
 package com.smsreceiver
 
+import android.text.method.LinkMovementMethod
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -88,6 +89,14 @@ class GroupedSmsAdapter(
                 messageHolder.senderText.text = item.sms.sender
                 messageHolder.messageText.text = item.sms.message
                 messageHolder.timestampText.text = item.sms.timestamp
+
+                // Enable link clicking when not in selection mode
+                if (isSelectionMode) {
+                    messageHolder.messageText.movementMethod = null
+                } else {
+                    messageHolder.messageText.movementMethod = LinkMovementMethod.getInstance()
+                }
+
                 messageHolder.checkBox.visibility = if (isSelectionMode) View.VISIBLE else View.GONE
                 messageHolder.checkBox.isChecked = item.isSelected
                 messageHolder.checkBox.setOnCheckedChangeListener(null) // Remove old listener
