@@ -417,7 +417,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             groupByArchive()
         }
-        groupedAdapter.updateItems(items)
+        groupedAdapter.restoreCollapsedState(items)
+        groupedAdapter.notifyDataSetChanged()
     }
 
     private fun groupByInbox(): List<ListItem> {

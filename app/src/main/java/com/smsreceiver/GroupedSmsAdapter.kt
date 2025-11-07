@@ -9,7 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 sealed class ListItem {
-    data class Header(val title: String, var isSelected: Boolean = false) : ListItem()
+    data class Header(val title: String, var isSelected: Boolean = false, var isCollapsed: Boolean = false) : ListItem()
     data class Message(val sms: SmsData, var isSelected: Boolean = false) : ListItem()
 }
 
@@ -33,6 +33,7 @@ class GroupedSmsAdapter(
     class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val headerText: TextView = view.findViewById(R.id.headerText)
         val checkBox: CheckBox = view.findViewById(R.id.checkBox)
+        val collapseIcon: TextView = view.findViewById(R.id.collapseIcon)
     }
 
     class MessageViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -77,8 +78,17 @@ class GroupedSmsAdapter(
                     item.isSelected = isChecked
                     onItemClick(position)
                 }
+
+                // Update collapse icon rotation
+                headerHolder.collapseIcon.rotation = if (item.isCollapsed) -90f else 0f
+
                 holder.itemView.setOnClickListener {
-                    if (isSelectionMode) onItemClick(position)
+                    if (isSelectionMode) {
+                        onItemClick(position)
+                    } else {
+                        // Toggle collapse/expand
+                        toggleCollapse(position)
+                    }
                 }
                 holder.itemView.setOnLongClickListener {
                     onItemLongClick(position)
@@ -154,5 +164,71 @@ class GroupedSmsAdapter(
 
     fun getSelectedCount(): Int {
         return items.filterIsInstance<ListItem.Message>().count { it.isSelected }
+    }
+
+    private fun toggleCollapse(headerPosition: Int) {
+        val headerItem = items.getOrNull(headerPosition) as? ListItem.Header ?: return
+
+        // Toggle the collapse state
+        headerItem.isCollapsed = !headerItem.isCollapsed
+
+        // Find all child messages under this header
+        val childPositions = mutableListOf<Int>()
+        var pos = headerPosition + 1
+        while (pos < items.size) {
+            when (items[pos]) {
+                is ListItem.Header -> break // Stop at next header
+                is ListItem.Message -> {
+                    childPositions.add(pos)
+                    pos++
+                }
+            }
+        }
+
+        if (headerItem.isCollapsed) {
+            // Remove child messages from display
+            childPositions.reversed().forEach { position ->
+                items.removeAt(position)
+            }
+            notifyItemChanged(headerPosition) // Update icon
+            notifyItemRangeRemoved(headerPosition + 1, childPositions.size)
+        } else {
+            // This shouldn't happen in normal flow since we removed items
+            // We need to restore items - this is handled by refreshDisplay in MainActivity
+            notifyItemChanged(headerPosition)
+        }
+    }
+
+    fun restoreCollapsedState(newItems: List<ListItem>) {
+        // Preserve collapse state when items are updated
+        val collapsedHeaders = items.filterIsInstance<ListItem.Header>()
+            .filter { it.isCollapsed }
+            .map { it.title }
+            .toSet()
+
+        items.clear()
+
+        val filteredItems = mutableListOf<ListItem>()
+        var i = 0
+        while (i < newItems.size) {
+            val item = newItems[i]
+            if (item is ListItem.Header) {
+                // Restore collapsed state if it was previously collapsed
+                if (item.title in collapsedHeaders) {
+                    item.isCollapsed = true
+                    filteredItems.add(item)
+                    // Skip child messages
+                    i++
+                    while (i < newItems.size && newItems[i] is ListItem.Message) {
+                        i++
+                    }
+                    continue
+                }
+            }
+            filteredItems.add(item)
+            i++
+        }
+
+        items.addAll(filteredItems)
     }
 }
