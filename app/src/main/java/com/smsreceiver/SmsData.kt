@@ -6,5 +6,6 @@ data class SmsData(
     val timestamp: String,
     val timestampMillis: Long = 0L,
     var isArchived: Boolean = false,
-    var archiveTimestamp: Long = 0L
+    var archiveTimestamp: Long = 0L,
+    var tags: MutableSet<String> = mutableSetOf() // Tags: "saved", "receipts" - messages can have multiple tags
 )

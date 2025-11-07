@@ -256,8 +256,10 @@ class MainActivity : AppCompatActivity() {
                     val isArchived = if (parts.size > 3) parts[3] == "1" else false
                     val archiveTimestamp = if (parts.size > 4) parts[4].toLongOrNull() ?: 0L else 0L
                     val timestampMillis = if (parts.size > 5) parts[5].toLongOrNull() ?: 0L else 0L
+                    val tagsString = if (parts.size > 6) parts[6] else ""
+                    val tags = if (tagsString.isNotEmpty()) tagsString.split(",").toMutableSet() else mutableSetOf()
 
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, isArchived, archiveTimestamp))
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, isArchived, archiveTimestamp, tags))
                 }
             }
         }
@@ -482,7 +484,8 @@ class MainActivity : AppCompatActivity() {
                 .replace("\\", "\\\\")
                 .replace("\n", "\\n")
                 .replace("|", "\\|")
-            "${sms.timestamp}|${sms.sender}|$escapedMessage|${if (sms.isArchived) "1" else "0"}|${sms.archiveTimestamp}|${sms.timestampMillis}"
+            val tagsString = sms.tags.joinToString(",")
+            "${sms.timestamp}|${sms.sender}|$escapedMessage|${if (sms.isArchived) "1" else "0"}|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString"
         }
         prefs.edit().putString("sms_list", lines.joinToString("\n")).apply()
     }

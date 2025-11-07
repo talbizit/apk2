@@ -82,12 +82,24 @@
         android:background="#212121"
         app:tabTextColor="#B0B0B0"
         app:tabSelectedTextColor="#FFFFFF"
-        app:tabIndicatorColor="#4CAF50">
+        app:tabIndicatorColor="#4CAF50"
+        app:tabMode="scrollable"
+        app:tabMaxWidth="0dp">
 
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Inbox" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Saved" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Receipts" />
 
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
