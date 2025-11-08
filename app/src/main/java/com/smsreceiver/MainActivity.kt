@@ -249,7 +249,12 @@ class MainActivity : AppCompatActivity() {
                     val tagsString = if (parts.size > 6) parts[6] else ""
                     val tags = if (tagsString.isNotEmpty()) tagsString.split(",").toMutableSet() else mutableSetOf()
 
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, isArchived, archiveTimestamp, tags))
+                    // Migrate old isArchived to tag system
+                    if (isArchived && !tags.contains("archived")) {
+                        tags.add("archived")
+                    }
+
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags))
                 }
             }
         }
@@ -283,7 +288,12 @@ class MainActivity : AppCompatActivity() {
                     val tagsString = if (parts.size > 6) parts[6] else ""
                     val tags = if (tagsString.isNotEmpty()) tagsString.split(",").toMutableSet() else mutableSetOf()
 
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, isArchived, archiveTimestamp, tags))
+                    // Migrate old isArchived to tag system
+                    if (isArchived && !tags.contains("archived")) {
+                        tags.add("archived")
+                    }
+
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags))
                 }
             }
         }
@@ -316,17 +326,17 @@ class MainActivity : AppCompatActivity() {
 
                     when (direction) {
                         ItemTouchHelper.RIGHT -> {
-                            // Archive/Restore functionality
-                            if (currentTab == 3) {
-                                // Restore to inbox (preserve tags)
-                                sms.isArchived = false
+                            // Archive/Unarchive functionality (toggle "archived" tag)
+                            if (sms.tags.contains("archived")) {
+                                // Remove archived tag
+                                sms.tags.remove("archived")
                                 sms.archiveTimestamp = 0L
-                                Toast.makeText(this@MainActivity, "Message restored to inbox", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this@MainActivity, "Unarchived", Toast.LENGTH_SHORT).show()
                             } else {
-                                // Archive the message (preserve tags)
-                                sms.isArchived = true
+                                // Add archived tag (preserves other tags)
+                                sms.tags.add("archived")
                                 sms.archiveTimestamp = System.currentTimeMillis()
-                                Toast.makeText(this@MainActivity, "Message archived", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this@MainActivity, "Archived", Toast.LENGTH_SHORT).show()
                             }
                             saveAllSms()
                             refreshDisplay()
@@ -371,8 +381,9 @@ class MainActivity : AppCompatActivity() {
                     )
                     archiveBackground.draw(c)
 
-                    // Draw text based on current tab
-                    val text = if (currentTab == 3) "Unarchived" else "Archived"
+                    // Draw text based on whether message has "archived" tag
+                    val smsItem = item as? ListItem.Message
+                    val text = if (smsItem?.sms?.tags?.contains("archived") == true) "Unarchive" else "Archive"
                     val textX = itemView.left.toFloat() + 40f
                     val textY = itemView.top + (itemView.height / 2f) + (textPaint.textSize / 3f)
 
@@ -418,10 +429,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTabTitles() {
-        val inboxCount = smsList.count { !it.isArchived && it.tags.isEmpty() }
-        val savedCount = smsList.count { !it.isArchived && it.tags.contains("saved") }
-        val receiptsCount = smsList.count { !it.isArchived && it.tags.contains("receipts") }
-        val archiveCount = smsList.count { it.isArchived }
+        val inboxCount = smsList.count { it.tags.isEmpty() }
+        val savedCount = smsList.count { it.tags.contains("saved") }
+        val receiptsCount = smsList.count { it.tags.contains("receipts") }
+        val archiveCount = smsList.count { it.tags.contains("archived") }
 
         tabLayout.getTabAt(0)?.text = "Inbox ($inboxCount)"
         tabLayout.getTabAt(1)?.text = "Saved ($savedCount)"
@@ -430,22 +441,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun groupByInbox(): List<ListItem> {
-        val inboxMessages = smsList.filter { !it.isArchived && it.tags.isEmpty() }
+        // Inbox = messages with no tags at all
+        val inboxMessages = smsList.filter { it.tags.isEmpty() }
         return groupBySender(inboxMessages)
     }
 
     private fun groupBySaved(): List<ListItem> {
-        val savedMessages = smsList.filter { !it.isArchived && it.tags.contains("saved") }
+        // Saved = messages with "saved" tag (may have other tags too)
+        val savedMessages = smsList.filter { it.tags.contains("saved") }
         return groupBySender(savedMessages)
     }
 
     private fun groupByReceipts(): List<ListItem> {
-        val receiptsMessages = smsList.filter { !it.isArchived && it.tags.contains("receipts") }
+        // Receipts = messages with "receipts" tag (may have other tags too)
+        val receiptsMessages = smsList.filter { it.tags.contains("receipts") }
         return groupBySender(receiptsMessages)
     }
 
     private fun groupByArchive(): List<ListItem> {
-        val archivedMessages = smsList.filter { it.isArchived }
+        // Archive = messages with "archived" tag (may have other tags too)
+        val archivedMessages = smsList.filter { it.tags.contains("archived") }
         return groupByTimeCategories(archivedMessages)
     }
 
@@ -500,7 +515,8 @@ class MainActivity : AppCompatActivity() {
                 .replace("\n", "\\n")
                 .replace("|", "\\|")
             val tagsString = sms.tags.joinToString(",")
-            "${sms.timestamp}|${sms.sender}|$escapedMessage|${if (sms.isArchived) "1" else "0"}|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString"
+            // isArchived field is deprecated (always "0"), archived status is now in tags
+            "${sms.timestamp}|${sms.sender}|$escapedMessage|0|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString"
         }
         prefs.edit().putString("sms_list", lines.joinToString("\n")).apply()
     }
@@ -613,27 +629,19 @@ class MainActivity : AppCompatActivity() {
     private fun handleItemLongClick(position: Int): Boolean {
         val item = groupedAdapter.getItemAtPosition(position)
 
-        // In Archive tab: multi-select delete mode
-        if (!isSelectionMode && currentTab == 3) {
-            enterSelectionMode()
-            when (item) {
-                is ListItem.Header -> {
-                    item.isSelected = true
-                    selectGroupItems(position, true)
-                }
-                is ListItem.Message -> {
-                    item.isSelected = true
-                }
-                null -> {}
-            }
-            groupedAdapter.notifyDataSetChanged()
-            updateSelectionCount()
+        // Show tags dialog for any message
+        if (item is ListItem.Message) {
+            showMoveToDialog(item.sms)
             return true
         }
 
-        // In other tabs: show "Move to" dialog
-        if (currentTab in 0..2 && item is ListItem.Message) {
-            showMoveToDialog(item.sms)
+        // For headers in Archive tab: multi-select delete mode
+        if (!isSelectionMode && currentTab == 3 && item is ListItem.Header) {
+            enterSelectionMode()
+            item.isSelected = true
+            selectGroupItems(position, true)
+            groupedAdapter.notifyDataSetChanged()
+            updateSelectionCount()
             return true
         }
 
@@ -689,7 +697,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showArchiveAllConfirmation() {
-        val inboxCount = smsList.count { !it.isArchived }
+        val inboxCount = smsList.count { it.tags.isEmpty() }
 
         if (inboxCount == 0) {
             Toast.makeText(this, "Inbox is already empty", Toast.LENGTH_SHORT).show()
@@ -700,8 +708,13 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Archive All Messages")
             .setMessage("Archive all $inboxCount message(s) from Inbox?\n\nYou can restore them from the Archive tab later.")
             .setPositiveButton("Archive All") { _, _ ->
-                // Archive all inbox messages
-                smsList.forEach { if (!it.isArchived) it.isArchived = true; it.archiveTimestamp = System.currentTimeMillis() }
+                // Archive all inbox messages (add archived tag)
+                smsList.forEach {
+                    if (it.tags.isEmpty()) {
+                        it.tags.add("archived")
+                        it.archiveTimestamp = System.currentTimeMillis()
+                    }
+                }
                 saveAllSms()
                 refreshDisplay()
                 Toast.makeText(this, "All messages archived", Toast.LENGTH_SHORT).show()
@@ -711,7 +724,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showDeleteArchiveConfirmation() {
-        val archiveCount = smsList.count { it.isArchived }
+        val archiveCount = smsList.count { it.tags.contains("archived") }
 
         if (archiveCount == 0) {
             Toast.makeText(this, "Archive is already empty", Toast.LENGTH_SHORT).show()
@@ -750,7 +763,7 @@ class MainActivity : AppCompatActivity() {
 
             positiveButton.setOnClickListener {
                 // Perform the deletion
-                smsList.removeAll { it.isArchived }
+                smsList.removeAll { it.tags.contains("archived") }
                 saveAllSms()
                 refreshDisplay()
                 Toast.makeText(this, "Archive cleared permanently", Toast.LENGTH_SHORT).show()
@@ -762,7 +775,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showClearTagConfirmation(tag: String, tagDisplayName: String) {
-        val tagCount = smsList.count { !it.isArchived && it.tags.contains(tag) }
+        val tagCount = smsList.count { it.tags.contains(tag) }
 
         if (tagCount == 0) {
             Toast.makeText(this, "$tagDisplayName folder is already empty", Toast.LENGTH_SHORT).show()
@@ -771,11 +784,11 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("Clear $tagDisplayName Folder")
-            .setMessage("Remove $tagCount message(s) from $tagDisplayName folder?\n\nMessages will return to Inbox (they won't be deleted).")
+            .setMessage("Remove $tagCount message(s) from $tagDisplayName folder?\n\nMessages will move to Inbox or remain in other folders.")
             .setPositiveButton("Clear") { _, _ ->
-                // Remove tag from all messages in this folder
+                // Remove tag from all messages that have it
                 smsList.forEach {
-                    if (!it.isArchived && it.tags.contains(tag)) {
+                    if (it.tags.contains(tag)) {
                         it.tags.remove(tag)
                     }
                 }
@@ -788,36 +801,57 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMoveToDialog(sms: SmsData) {
-        val options = arrayOf("Inbox", "Saved", "Receipts")
-
-        // Determine current location
-        val currentLocation = when {
-            sms.tags.contains("saved") -> "Saved"
-            sms.tags.contains("receipts") -> "Receipts"
-            else -> "Inbox"
-        }
+        val tagOptions = arrayOf("Inbox", "Saved", "Receipts", "Archive")
+        val checkedItems = booleanArrayOf(
+            sms.tags.isEmpty(),                    // Inbox = no tags
+            sms.tags.contains("saved"),            // Saved
+            sms.tags.contains("receipts"),         // Receipts
+            sms.tags.contains("archived")          // Archive
+        )
 
         AlertDialog.Builder(this)
-            .setTitle("Move to folder")
-            .setItems(options) { _, which ->
+            .setTitle("Tags")
+            .setMultiChoiceItems(tagOptions, checkedItems) { _, which, isChecked ->
+                // Handle checkbox changes
                 when (which) {
                     0 -> { // Inbox
-                        sms.tags.clear()
-                        Toast.makeText(this, "Moved to Inbox", Toast.LENGTH_SHORT).show()
+                        if (isChecked) {
+                            // Clear all tags when Inbox is selected
+                            checkedItems[1] = false
+                            checkedItems[2] = false
+                            checkedItems[3] = false
+                        }
                     }
-                    1 -> { // Saved
-                        sms.tags.clear()
-                        sms.tags.add("saved")
-                        Toast.makeText(this, "Moved to Saved", Toast.LENGTH_SHORT).show()
-                    }
-                    2 -> { // Receipts
-                        sms.tags.clear()
-                        sms.tags.add("receipts")
-                        Toast.makeText(this, "Moved to Receipts", Toast.LENGTH_SHORT).show()
+                    1, 2, 3 -> { // Saved, Receipts, Archive
+                        if (isChecked) {
+                            // Uncheck Inbox when any tag is added
+                            checkedItems[0] = false
+                        }
                     }
                 }
+            }
+            .setPositiveButton("OK") { _, _ ->
+                // Apply the selected tags
+                sms.tags.clear()
+
+                if (checkedItems[0]) {
+                    // Inbox selected - no tags
+                    sms.tags.clear()
+                } else {
+                    // Add selected tags
+                    if (checkedItems[1]) sms.tags.add("saved")
+                    if (checkedItems[2]) sms.tags.add("receipts")
+                    if (checkedItems[3]) sms.tags.add("archived")
+                }
+
                 saveAllSms()
                 refreshDisplay()
+
+                val tagNames = when {
+                    sms.tags.isEmpty() -> "Inbox"
+                    else -> sms.tags.joinToString(", ") { it.capitalize() }
+                }
+                Toast.makeText(this, "Tags: $tagNames", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
             .show()
