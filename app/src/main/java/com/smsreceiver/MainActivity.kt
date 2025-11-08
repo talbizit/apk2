@@ -64,6 +64,10 @@ class MainActivity : AppCompatActivity() {
     // Track current tab (0 = Inbox, 1 = Saved, 2 = Receipts, 3 = Archive)
     private var currentTab = 0
 
+    // Viewport tracking for auto-read
+    private val viewportHandler = Handler(Looper.getMainLooper())
+    private val visibleMessages = mutableMapOf<SmsData, Runnable>()
+
     // Selection mode tracking
     private var isSelectionMode = false
 
@@ -109,6 +113,9 @@ class MainActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = groupedAdapter
 
+        // Setup viewport tracking for auto-read
+        setupViewportTracking()
+
         // Setup swipe to archive/restore
         setupSwipeGesture()
 
@@ -147,6 +154,9 @@ class MainActivity : AppCompatActivity() {
         loadStoredSms()
         refreshDisplay()
         updateTabTitles()
+
+        // Trigger initial viewport tracking
+        recyclerView.post { updateVisibleMessages() }
     }
 
     override fun onResume() {
@@ -422,6 +432,61 @@ class MainActivity : AppCompatActivity() {
 
         val itemTouchHelper = ItemTouchHelper(swipeHandler)
         itemTouchHelper.attachToRecyclerView(recyclerView)
+    }
+
+    private fun setupViewportTracking() {
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                updateVisibleMessages()
+            }
+        })
+    }
+
+    private fun updateVisibleMessages() {
+        // Check if auto-read is enabled
+        val prefs = getSharedPreferences("forwarding_settings", Context.MODE_PRIVATE)
+        val autoReadEnabled = prefs.getBoolean("auto_read_enabled", false)
+        if (!autoReadEnabled) return
+
+        val layoutManager = recyclerView.layoutManager as? LinearLayoutManager ?: return
+        val firstVisible = layoutManager.findFirstCompletelyVisibleItemPosition()
+        val lastVisible = layoutManager.findLastCompletelyVisibleItemPosition()
+
+        if (firstVisible == RecyclerView.NO_POSITION || lastVisible == RecyclerView.NO_POSITION) return
+
+        // Get currently visible unread messages
+        val currentlyVisibleMessages = mutableSetOf<SmsData>()
+        for (position in firstVisible..lastVisible) {
+            val item = groupedAdapter.getItemAtPosition(position)
+            if (item is ListItem.Message && !item.sms.isRead) {
+                currentlyVisibleMessages.add(item.sms)
+            }
+        }
+
+        // Remove runnables for messages no longer visible
+        val iterator = visibleMessages.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (!currentlyVisibleMessages.contains(entry.key)) {
+                viewportHandler.removeCallbacks(entry.value)
+                iterator.remove()
+            }
+        }
+
+        // Schedule mark-as-read for newly visible messages
+        for (sms in currentlyVisibleMessages) {
+            if (!visibleMessages.containsKey(sms)) {
+                val runnable = Runnable {
+                    sms.isRead = true
+                    saveAllSms()
+                    refreshDisplay()
+                    visibleMessages.remove(sms)
+                }
+                visibleMessages[sms] = runnable
+                viewportHandler.postDelayed(runnable, 5000) // 5 seconds
+            }
+        }
     }
 
     private fun refreshDisplay() {

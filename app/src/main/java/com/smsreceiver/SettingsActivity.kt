@@ -22,6 +22,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var emailPasswordInput: TextInputEditText
     private lateinit var smsToggle: SwitchMaterial
     private lateinit var phoneInput: TextInputEditText
+    private lateinit var autoReadToggle: SwitchMaterial
     private lateinit var saveButton: Button
     private lateinit var tagListContainer: LinearLayout
     private lateinit var addTagButton: Button
@@ -44,6 +45,7 @@ class SettingsActivity : AppCompatActivity() {
         emailPasswordInput = findViewById(R.id.emailPasswordInput)
         smsToggle = findViewById(R.id.smsToggle)
         phoneInput = findViewById(R.id.phoneInput)
+        autoReadToggle = findViewById(R.id.autoReadToggle)
         saveButton = findViewById(R.id.saveButton)
         tagListContainer = findViewById(R.id.tagListContainer)
         addTagButton = findViewById(R.id.addTagButton)
@@ -74,6 +76,8 @@ class SettingsActivity : AppCompatActivity() {
 
         smsToggle.isChecked = prefs.getBoolean("sms_enabled", true)
         phoneInput.setText(prefs.getString("phone_number", "0552316516"))
+
+        autoReadToggle.isChecked = prefs.getBoolean("auto_read_enabled", false)
     }
 
     private fun loadCustomTags() {
@@ -349,6 +353,7 @@ class SettingsActivity : AppCompatActivity() {
             putString("email_password", emailPassword)
             putBoolean("sms_enabled", smsToggle.isChecked)
             putString("phone_number", phone)
+            putBoolean("auto_read_enabled", autoReadToggle.isChecked)
             apply()
         }
 

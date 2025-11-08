@@ -210,6 +210,39 @@
             android:layout_marginTop="24dp"
             android:layout_marginBottom="24dp" />
 
+        <!-- Reading Settings Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Reading Settings"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:paddingBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/autoReadToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Auto-mark as read after 5 seconds"
+            android:checked="false"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Automatically mark messages as read when visible in viewport for 5 seconds"
+            android:textSize="13sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:paddingBottom="16dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="24dp" />
+
         <!-- Save Button -->
         <Button
             android:id="@+id/saveButton"
