@@ -4,13 +4,20 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Envelope icon centered -->
     <group
-        android:scaleX="0.58"
-        android:scaleY="0.58"
-        android:translateX="22.68"
-        android:translateY="22.68">
+        android:scaleX="1.8"
+        android:scaleY="1.8"
+        android:translateX="27"
+        android:translateY="27">
+        <!-- Envelope body -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M20,2L4,2c-1.1,0 -1.99,0.9 -1.99,2L2,22l4,-4h14c1.1,0 2,-0.9 2,-2L22,4c0,-1.1 -0.9,-2 -2,-2zM9,11L7,11L7,9h2v2zM13,11h-2L11,9h2v2zM17,11h-2L15,9h2v2z" />
+            android:pathData="M28,5 L2,5 C0.9,5 0.01,5.9 0.01,7 L0,21 C0,22.1 0.9,23 2,23 L28,23 C29.1,23 30,22.1 30,21 L30,7 C30,5.9 29.1,5 28,5 Z M28,9 L15,16 L2,9 L2,7 L15,14 L28,7 L28,9 Z" />
+
+        <!-- SMS indicator dot (top right) -->
+        <path
+            android:fillColor="#4CAF50"
+            android:pathData="M 24,4 m -3,0 a 3,3 0 1,1 6,0 a 3,3 0 1,1 -6,0" />
     </group>
 </vector>
