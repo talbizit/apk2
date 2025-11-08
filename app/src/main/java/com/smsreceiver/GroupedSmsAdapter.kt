@@ -114,15 +114,22 @@ class GroupedSmsAdapter(
                 messageHolder.checkBox.setOnCheckedChangeListener { _, isChecked ->
                     item.isSelected = isChecked
                 }
+
+                // Set long-press on the entire card
+                val longClickListener = View.OnLongClickListener {
+                    onItemLongClick(position)
+                }
+                holder.itemView.setOnLongClickListener(longClickListener)
+                messageHolder.senderText.setOnLongClickListener(longClickListener)
+                messageHolder.messageText.setOnLongClickListener(longClickListener)
+                messageHolder.timestampText.setOnLongClickListener(longClickListener)
+
                 holder.itemView.setOnClickListener {
                     if (isSelectionMode) {
                         item.isSelected = !item.isSelected
                         messageHolder.checkBox.isChecked = item.isSelected
                         onItemClick(position)
                     }
-                }
-                holder.itemView.setOnLongClickListener {
-                    onItemLongClick(position)
                 }
             }
         }
