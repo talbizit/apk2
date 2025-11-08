@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                 val date = dateFormat.format(Date(timestamp))
 
-                val smsData = SmsData(sender, message, date, timestamp, isArchived = false, archiveTimestamp = 0L, tags = mutableSetOf())
+                val smsData = SmsData(sender, message, date, timestamp, isArchived = false, archiveTimestamp = 0L, tags = mutableSetOf(), isRead = false)
                 smsList.add(0, smsData)
                 refreshDisplay()
             }
@@ -253,13 +253,14 @@ class MainActivity : AppCompatActivity() {
                     val timestampMillis = if (parts.size > 5) parts[5].toLongOrNull() ?: 0L else 0L
                     val tagsString = if (parts.size > 6) parts[6] else ""
                     val tags = if (tagsString.isNotEmpty()) tagsString.split(",").toMutableSet() else mutableSetOf()
+                    val isRead = if (parts.size > 7) parts[7] == "1" else false
 
                     // Migrate old isArchived to tag system
                     if (isArchived && !tags.contains("archived")) {
                         tags.add("archived")
                     }
 
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags))
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags, isRead))
                 }
             }
         }
@@ -292,13 +293,14 @@ class MainActivity : AppCompatActivity() {
                     val timestampMillis = if (parts.size > 5) parts[5].toLongOrNull() ?: 0L else 0L
                     val tagsString = if (parts.size > 6) parts[6] else ""
                     val tags = if (tagsString.isNotEmpty()) tagsString.split(",").toMutableSet() else mutableSetOf()
+                    val isRead = if (parts.size > 7) parts[7] == "1" else false
 
                     // Migrate old isArchived to tag system
                     if (isArchived && !tags.contains("archived")) {
                         tags.add("archived")
                     }
 
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags))
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags, isRead))
                 }
             }
         }
@@ -527,8 +529,9 @@ class MainActivity : AppCompatActivity() {
                 .replace("\n", "\\n")
                 .replace("|", "\\|")
             val tagsString = sms.tags.joinToString(",")
-            // isArchived field is deprecated (always "0"), archived status is now in tags
-            "${sms.timestamp}|${sms.sender}|$escapedMessage|0|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString"
+            val isReadString = if (sms.isRead) "1" else "0"
+            // Format: timestamp|sender|message|deprecated|archiveTimestamp|timestampMillis|tags|isRead
+            "${sms.timestamp}|${sms.sender}|$escapedMessage|0|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString|$isReadString"
         }
         prefs.edit().putString("sms_list", lines.joinToString("\n")).apply()
     }
@@ -608,7 +611,7 @@ class MainActivity : AppCompatActivity() {
                     val date = dateFormat.format(Date(timestamp))
 
                     // Update UI
-                    val smsData = SmsData(address, body, date, timestamp, isArchived = false, archiveTimestamp = 0L, tags = mutableSetOf())
+                    val smsData = SmsData(address, body, date, timestamp, isArchived = false, archiveTimestamp = 0L, tags = mutableSetOf(), isRead = false)
                     smsList.add(0, smsData)
 
                     lastSmsId = id
