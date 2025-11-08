@@ -86,7 +86,7 @@
         android:layout_margin="16dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_menu_delete"
-        android:tint="#F44336"
+        app:tint="#F44336"
         android:contentDescription="Delete selected"
         android:visibility="gone"
         android:elevation="6dp" />

@@ -22,6 +22,7 @@ import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -46,7 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var groupedAdapter: GroupedSmsAdapter
     private lateinit var statusText: TextView
     private lateinit var clearButton: Button
-    private lateinit var deleteButton: Button
+    private lateinit var deleteButton: ImageButton
     private lateinit var settingsButton: Button
     private lateinit var tabLayout: TabLayout
     private val smsList = mutableListOf<SmsData>()
