@@ -1,5 +1,6 @@
 package com.smsreceiver
 
+import android.graphics.Typeface
 import android.text.method.LinkMovementMethod
 import android.view.LayoutInflater
 import android.view.View
@@ -100,6 +101,12 @@ class GroupedSmsAdapter(
                 messageHolder.senderText.text = item.sms.sender
                 messageHolder.messageText.text = item.sms.message
                 messageHolder.timestampText.text = item.sms.timestamp
+
+                // Make unread messages bold
+                val typefaceStyle = if (!item.sms.isRead) Typeface.BOLD else Typeface.NORMAL
+                messageHolder.senderText.setTypeface(null, typefaceStyle)
+                messageHolder.messageText.setTypeface(null, typefaceStyle)
+                messageHolder.timestampText.setTypeface(null, typefaceStyle)
 
                 // Enable link clicking when not in selection mode
                 if (isSelectionMode) {

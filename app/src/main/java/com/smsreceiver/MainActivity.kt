@@ -78,7 +78,9 @@ class MainActivity : AppCompatActivity() {
                 val date = dateFormat.format(Date(timestamp))
 
                 val smsData = SmsData(sender, message, date, timestamp, isArchived = false, archiveTimestamp = 0L, tags = mutableSetOf(), isRead = false)
+                applyAutoTagging(smsData)
                 smsList.add(0, smsData)
+                saveAllSms()
                 refreshDisplay()
             }
         }
@@ -430,22 +432,52 @@ class MainActivity : AppCompatActivity() {
             3 -> groupByArchive()    // Archived (tags preserved)
             else -> groupByInbox()
         }
-        groupedAdapter.restoreCollapsedState(items)
+
+        // Show empty state if no messages
+        if (items.isEmpty()) {
+            val emptyMessage = when (currentTab) {
+                0 -> "No messages in Inbox"
+                1 -> "No saved messages"
+                2 -> "No receipts"
+                3 -> "Archive is empty"
+                else -> "No messages"
+            }
+            val emptyItems = listOf(ListItem.Header(emptyMessage))
+            groupedAdapter.restoreCollapsedState(emptyItems)
+        } else {
+            groupedAdapter.restoreCollapsedState(items)
+        }
         groupedAdapter.notifyDataSetChanged()
         updateTabTitles()
     }
 
     private fun updateTabTitles() {
-        val inboxCount = smsList.count { it.tags.isEmpty() }
-        // Exclude archived messages from Saved and Receipts counts
-        val savedCount = smsList.count { it.tags.contains("saved") && !it.tags.contains("archived") }
-        val receiptsCount = smsList.count { it.tags.contains("receipts") && !it.tags.contains("archived") }
-        val archiveCount = smsList.count { it.tags.contains("archived") }
+        val inboxMessages = smsList.filter { it.tags.isEmpty() }
+        val savedMessages = smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") }
+        val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") }
+        val archiveMessages = smsList.filter { it.tags.contains("archived") }
 
-        tabLayout.getTabAt(0)?.text = "Inbox ($inboxCount)"
-        tabLayout.getTabAt(1)?.text = "Saved ($savedCount)"
-        tabLayout.getTabAt(2)?.text = "Receipts ($receiptsCount)"
-        tabLayout.getTabAt(3)?.text = "Archive ($archiveCount)"
+        val inboxCount = inboxMessages.size
+        val inboxUnread = inboxMessages.count { !it.isRead }
+        val savedCount = savedMessages.size
+        val savedUnread = savedMessages.count { !it.isRead }
+        val receiptsCount = receiptsMessages.size
+        val receiptsUnread = receiptsMessages.count { !it.isRead }
+        val archiveCount = archiveMessages.size
+        val archiveUnread = archiveMessages.count { !it.isRead }
+
+        tabLayout.getTabAt(0)?.text = formatTabTitle("Inbox", inboxCount, inboxUnread)
+        tabLayout.getTabAt(1)?.text = formatTabTitle("Saved", savedCount, savedUnread)
+        tabLayout.getTabAt(2)?.text = formatTabTitle("Receipts", receiptsCount, receiptsUnread)
+        tabLayout.getTabAt(3)?.text = formatTabTitle("Archive", archiveCount, archiveUnread)
+    }
+
+    private fun formatTabTitle(name: String, total: Int, unread: Int): String {
+        return if (unread > 0) {
+            "$name ($total, +$unread new)"
+        } else {
+            "$name ($total)"
+        }
     }
 
     private fun groupByInbox(): List<ListItem> {
@@ -480,7 +512,9 @@ class MainActivity : AppCompatActivity() {
 
         for ((sender, senderMessages) in grouped) {
             val count = senderMessages.size
-            val headerTitle = "$sender ($count)"
+            val hasUnread = senderMessages.any { !it.isRead }
+            val asterisk = if (hasUnread) "*" else ""
+            val headerTitle = "$asterisk$sender ($count)"
             result.add(ListItem.Header(headerTitle))
             senderMessages.forEach { result.add(ListItem.Message(it)) }
         }
@@ -503,12 +537,16 @@ class MainActivity : AppCompatActivity() {
         for ((category, categoryMessages) in categories) {
             if (categoryMessages.isNotEmpty()) {
                 val categoryCount = categoryMessages.size
-                result.add(ListItem.Header("$category ($categoryCount)"))
+                val categoryHasUnread = categoryMessages.any { !it.isRead }
+                val categoryAsterisk = if (categoryHasUnread) "*" else ""
+                result.add(ListItem.Header("$categoryAsterisk$category ($categoryCount)"))
                 // Group by sender within each time category
                 val senderGroups = categoryMessages.groupBy { it.sender }
                 for ((sender, senderMessages) in senderGroups) {
                     val senderCount = senderMessages.size
-                    result.add(ListItem.Header("  $sender ($senderCount)"))
+                    val senderHasUnread = senderMessages.any { !it.isRead }
+                    val senderAsterisk = if (senderHasUnread) "*" else ""
+                    result.add(ListItem.Header("  $senderAsterisk$sender ($senderCount)"))
                     senderMessages.forEach { result.add(ListItem.Message(it)) }
                 }
             }
@@ -612,6 +650,7 @@ class MainActivity : AppCompatActivity() {
 
                     // Update UI
                     val smsData = SmsData(address, body, date, timestamp, isArchived = false, archiveTimestamp = 0L, tags = mutableSetOf(), isRead = false)
+                    applyAutoTagging(smsData)
                     smsList.add(0, smsData)
 
                     lastSmsId = id
@@ -862,6 +901,18 @@ class MainActivity : AppCompatActivity() {
         buttonRow.addView(archiveButton)
         layout.addView(buttonRow)
 
+        // Mark Read/Unread button
+        val readButton = Button(this).apply {
+            text = if (sms.isRead) "✉️ Mark Unread" else "✓ Mark Read"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 20
+            }
+        }
+        layout.addView(readButton)
+
         // Load custom tags from settings
         val tagPrefs = getSharedPreferences("tag_settings", Context.MODE_PRIVATE)
         val customTagsString = tagPrefs.getString("custom_tags", "") ?: ""
@@ -919,6 +970,16 @@ class MainActivity : AppCompatActivity() {
             dialog.dismiss()
         }
 
+        // Mark Read/Unread button click
+        readButton.setOnClickListener {
+            sms.isRead = !sms.isRead
+            saveAllSms()
+            refreshDisplay()
+            val status = if (sms.isRead) "read" else "unread"
+            Toast.makeText(this, "Marked as $status", Toast.LENGTH_SHORT).show()
+            dialog.dismiss()
+        }
+
         // Set checkbox listeners for all tags
         for ((tag, checkbox) in checkboxes) {
             checkbox.setOnCheckedChangeListener { _, isChecked ->
@@ -936,6 +997,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun applyAutoTagging(sms: SmsData) {
+        // Auto-tag receipts based on Hebrew keywords
+        val receiptKeywords = listOf("חשבונית", "קבלה", "שובר")
+        if (receiptKeywords.any { sms.message.contains(it, ignoreCase = true) }) {
+            sms.tags.add("receipts")
+        }
     }
 
     private fun forwardMessage(sms: SmsData) {
