@@ -169,6 +169,47 @@
             android:layout_marginTop="24dp"
             android:layout_marginBottom="24dp" />
 
+        <!-- Tag Management Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tag Management"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Manage custom tags. Default tags (Saved, Receipts) cannot be renamed or deleted."
+            android:textSize="13sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:paddingBottom="16dp" />
+
+        <!-- Tag List -->
+        <LinearLayout
+            android:id="@+id/tagListContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="16dp" />
+
+        <Button
+            android:id="@+id/addTagButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="+ Add New Tag"
+            style="?android:attr/borderlessButtonStyle"
+            android:textColor="?attr/colorPrimary" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="24dp" />
+
         <!-- Save Button -->
         <Button
             android:id="@+id/saveButton"

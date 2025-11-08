@@ -834,7 +834,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val inboxButton = Button(this).apply {
-            text = "📥 Inbox (Clear All)"
+            text = "📥 Inbox"
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -859,23 +859,29 @@ class MainActivity : AppCompatActivity() {
         buttonRow.addView(archiveButton)
         layout.addView(buttonRow)
 
-        // Checkboxes for tags
-        val savedCheckbox = CheckBox(this).apply {
-            text = "Saved"
-            isChecked = sms.tags.contains("saved")
-            textSize = 16f
-            setPadding(0, 10, 0, 10)
+        // Load custom tags from settings
+        val tagPrefs = getSharedPreferences("tag_settings", Context.MODE_PRIVATE)
+        val customTagsString = tagPrefs.getString("custom_tags", "") ?: ""
+        val customTags = if (customTagsString.isNotEmpty()) {
+            customTagsString.split(",")
+        } else {
+            emptyList()
         }
 
-        val receiptsCheckbox = CheckBox(this).apply {
-            text = "Receipts"
-            isChecked = sms.tags.contains("receipts")
-            textSize = 16f
-            setPadding(0, 10, 0, 10)
-        }
+        // Create checkboxes for default and custom tags
+        val allTags = listOf("saved", "receipts") + customTags
+        val checkboxes = mutableMapOf<String, CheckBox>()
 
-        layout.addView(savedCheckbox)
-        layout.addView(receiptsCheckbox)
+        for (tag in allTags) {
+            val checkbox = CheckBox(this).apply {
+                text = tag.capitalize()
+                isChecked = sms.tags.contains(tag)
+                textSize = 16f
+                setPadding(0, 10, 0, 10)
+            }
+            checkboxes[tag] = checkbox
+            layout.addView(checkbox)
+        }
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Tags")
@@ -910,32 +916,20 @@ class MainActivity : AppCompatActivity() {
             dialog.dismiss()
         }
 
-        // Saved checkbox - auto-close on click
-        savedCheckbox.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                sms.tags.add("saved")
-            } else {
-                sms.tags.remove("saved")
+        // Set checkbox listeners for all tags
+        for ((tag, checkbox) in checkboxes) {
+            checkbox.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    sms.tags.add(tag)
+                } else {
+                    sms.tags.remove(tag)
+                }
+                saveAllSms()
+                refreshDisplay()
+                val action = if (isChecked) "added" else "removed"
+                Toast.makeText(this, "${tag.capitalize()} tag $action", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
             }
-            saveAllSms()
-            refreshDisplay()
-            val action = if (isChecked) "added" else "removed"
-            Toast.makeText(this, "Saved tag $action", Toast.LENGTH_SHORT).show()
-            dialog.dismiss()
-        }
-
-        // Receipts checkbox - auto-close on click
-        receiptsCheckbox.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                sms.tags.add("receipts")
-            } else {
-                sms.tags.remove("receipts")
-            }
-            saveAllSms()
-            refreshDisplay()
-            val action = if (isChecked) "added" else "removed"
-            Toast.makeText(this, "Receipts tag $action", Toast.LENGTH_SHORT).show()
-            dialog.dismiss()
         }
 
         dialog.show()
