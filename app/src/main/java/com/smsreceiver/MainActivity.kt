@@ -477,7 +477,9 @@ class MainActivity : AppCompatActivity() {
         val grouped = messages.groupBy { it.sender }
 
         for ((sender, senderMessages) in grouped) {
-            result.add(ListItem.Header(sender))
+            val count = senderMessages.size
+            val headerTitle = "$sender ($count)"
+            result.add(ListItem.Header(headerTitle))
             senderMessages.forEach { result.add(ListItem.Message(it)) }
         }
 
@@ -498,11 +500,13 @@ class MainActivity : AppCompatActivity() {
 
         for ((category, categoryMessages) in categories) {
             if (categoryMessages.isNotEmpty()) {
-                result.add(ListItem.Header(category))
+                val categoryCount = categoryMessages.size
+                result.add(ListItem.Header("$category ($categoryCount)"))
                 // Group by sender within each time category
                 val senderGroups = categoryMessages.groupBy { it.sender }
                 for ((sender, senderMessages) in senderGroups) {
-                    result.add(ListItem.Header("  $sender"))
+                    val senderCount = senderMessages.size
+                    result.add(ListItem.Header("  $sender ($senderCount)"))
                     senderMessages.forEach { result.add(ListItem.Message(it)) }
                 }
             }
