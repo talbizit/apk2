@@ -23,10 +23,10 @@ import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var groupedAdapter: GroupedSmsAdapter
     private lateinit var statusText: TextView
     private lateinit var clearButton: Button
-    private lateinit var deleteButton: ImageButton
+    private lateinit var deleteButton: FloatingActionButton
     private lateinit var settingsButton: Button
     private lateinit var tabLayout: TabLayout
     private val smsList = mutableListOf<SmsData>()
@@ -87,6 +87,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Hide action bar for maximum screen space
+        supportActionBar?.hide()
 
         recyclerView = findViewById(R.id.recyclerView)
         statusText = findViewById(R.id.statusText)
@@ -221,7 +224,7 @@ class MainActivity : AppCompatActivity() {
         when (requestCode) {
             SMS_PERMISSION_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                    Toast.makeText(this, "Permissions granted! SMS Receiver is active.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "SMS permissions are required for this app to work", Toast.LENGTH_LONG).show()
                 }

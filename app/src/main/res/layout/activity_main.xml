@@ -77,19 +77,18 @@
         android:visibility="gone" />
 
     <!-- Delete icon button (floating) -->
-    <ImageButton
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/deleteButton"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
         android:layout_margin="16dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_menu_delete"
-        app:tint="#F44336"
+        app:tint="@android:color/white"
+        app:backgroundTint="#F44336"
         android:contentDescription="Delete selected"
-        android:visibility="gone"
-        android:elevation="6dp" />
+        android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
