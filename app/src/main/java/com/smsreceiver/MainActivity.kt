@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var clearButton: Button
     private lateinit var deleteButton: FloatingActionButton
     private lateinit var settingsButton: Button
+    private lateinit var markAllReadButton: Button
     private lateinit var tabLayout: TabLayout
     private val smsList = mutableListOf<SmsData>()
 
@@ -102,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         clearButton = findViewById(R.id.clearButton)
         deleteButton = findViewById(R.id.deleteButton)
         settingsButton = findViewById(R.id.settingsButton)
+        markAllReadButton = findViewById(R.id.markAllReadButton)
         tabLayout = findViewById(R.id.tabLayout)
 
         groupedAdapter = GroupedSmsAdapter(
@@ -148,6 +150,18 @@ class MainActivity : AppCompatActivity() {
         settingsButton.setOnClickListener {
             val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
+        }
+
+        markAllReadButton.setOnClickListener {
+            val unreadCount = smsList.count { !it.isRead }
+            if (unreadCount > 0) {
+                smsList.forEach { it.isRead = true }
+                saveAllSms()
+                refreshDisplay()
+                Toast.makeText(this, "$unreadCount message(s) marked as read", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "All messages already read", Toast.LENGTH_SHORT).show()
+            }
         }
 
         checkAndRequestPermissions()
@@ -748,7 +762,13 @@ class MainActivity : AppCompatActivity() {
     private fun handleItemLongClick(position: Int): Boolean {
         val item = groupedAdapter.getItemAtPosition(position)
 
-        // Show tags dialog for any message
+        // For messages in Archive tab: show simplified delete dialog
+        if (item is ListItem.Message && currentTab == 3) {
+            showArchiveDeleteDialog(item.sms)
+            return true
+        }
+
+        // For messages in other tabs: show full tags dialog
         if (item is ListItem.Message) {
             showMoveToDialog(item.sms)
             return true
@@ -1062,6 +1082,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun showArchiveDeleteDialog(sms: SmsData) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete Message")
+            .setMessage("Permanently delete this message?\n\nFrom: ${sms.sender}\nTime: ${sms.timestamp}")
+            .setPositiveButton("🗑️ Delete") { _, _ ->
+                smsList.remove(sms)
+                saveAllSms()
+                refreshDisplay()
+                Toast.makeText(this, "Message deleted permanently", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("✕ Cancel", null)
+            .create()
+            .show()
     }
 
     private fun applyAutoTagging(sms: SmsData) {
