@@ -77,7 +77,6 @@ class MainActivity : AppCompatActivity() {
                 val smsData = SmsData(sender, message, date, timestamp, isArchived = false, archiveTimestamp = 0L, tags = mutableSetOf())
                 smsList.add(0, smsData)
                 refreshDisplay()
-                updateStatus()
             }
         }
     }
@@ -117,14 +116,8 @@ class MainActivity : AppCompatActivity() {
             override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
 
-        clearButton.setOnClickListener {
-            when (currentTab) {
-                0 -> showArchiveAllConfirmation()
-                1 -> showClearTagConfirmation("saved", "Saved")
-                2 -> showClearTagConfirmation("receipts", "Receipts")
-                3 -> showDeleteArchiveConfirmation()
-            }
-        }
+        // Clear button is now hidden - functionality moved to long-press menu
+        clearButton.setOnClickListener { }
 
         deleteButton.setOnClickListener {
             val selectedItems = groupedAdapter.getSelectedItems()
@@ -133,7 +126,6 @@ class MainActivity : AppCompatActivity() {
                 saveAllSms()
                 exitSelectionMode()
                 refreshDisplay()
-                updateStatus()
                 Toast.makeText(this, "${selectedItems.size} message(s) deleted permanently", Toast.LENGTH_SHORT).show()
             }
         }
@@ -144,10 +136,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkAndRequestPermissions()
-        updateClearButtonText()
         loadStoredSms()
         refreshDisplay()
-        updateStatus()
+        updateTabTitles()
     }
 
     override fun onResume() {
@@ -228,7 +219,6 @@ class MainActivity : AppCompatActivity() {
             SMS_PERMISSION_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                     Toast.makeText(this, "Permissions granted! SMS Receiver is active.", Toast.LENGTH_LONG).show()
-                    updateStatus()
                 } else {
                     Toast.makeText(this, "SMS permissions are required for this app to work", Toast.LENGTH_LONG).show()
                 }
@@ -297,7 +287,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         refreshDisplay()
-        updateStatus()
     }
 
     private fun setupSwipeGesture() {
@@ -340,7 +329,6 @@ class MainActivity : AppCompatActivity() {
                             }
                             saveAllSms()
                             refreshDisplay()
-                            updateStatus()
                         }
                         ItemTouchHelper.LEFT -> {
                             // Forward functionality
@@ -425,6 +413,19 @@ class MainActivity : AppCompatActivity() {
         }
         groupedAdapter.restoreCollapsedState(items)
         groupedAdapter.notifyDataSetChanged()
+        updateTabTitles()
+    }
+
+    private fun updateTabTitles() {
+        val inboxCount = smsList.count { !it.isArchived && it.tags.isEmpty() }
+        val savedCount = smsList.count { !it.isArchived && it.tags.contains("saved") }
+        val receiptsCount = smsList.count { !it.isArchived && it.tags.contains("receipts") }
+        val archiveCount = smsList.count { it.isArchived }
+
+        tabLayout.getTabAt(0)?.text = "Inbox ($inboxCount)"
+        tabLayout.getTabAt(1)?.text = "Saved ($savedCount)"
+        tabLayout.getTabAt(2)?.text = "Receipts ($receiptsCount)"
+        tabLayout.getTabAt(3)?.text = "Archive ($archiveCount)"
     }
 
     private fun groupByInbox(): List<ListItem> {
@@ -585,7 +586,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 saveAllSms()
                 refreshDisplay()
-                updateStatus()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -672,27 +672,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateSelectionCount() {
-        val count = groupedAdapter.getSelectedCount()
-        statusText.text = "Selected: $count message(s)"
+        // Status text is hidden - selection shown via UI highlighting
     }
 
     override fun onBackPressed() {
         if (isSelectionMode) {
             exitSelectionMode()
-            updateStatus()
         } else {
             super.onBackPressed()
         }
     }
 
     private fun updateClearButtonText() {
-        clearButton.text = when (currentTab) {
-            0 -> "Archive All"
-            1 -> "Clear Saved"
-            2 -> "Clear Receipts"
-            3 -> "Clear Archive"
-            else -> "Clear All"
-        }
+        // Button is now hidden - functionality in long-press menu
     }
 
     private fun showArchiveAllConfirmation() {
@@ -711,7 +703,6 @@ class MainActivity : AppCompatActivity() {
                 smsList.forEach { if (!it.isArchived) it.isArchived = true; it.archiveTimestamp = System.currentTimeMillis() }
                 saveAllSms()
                 refreshDisplay()
-                updateStatus()
                 Toast.makeText(this, "All messages archived", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
@@ -761,7 +752,6 @@ class MainActivity : AppCompatActivity() {
                 smsList.removeAll { it.isArchived }
                 saveAllSms()
                 refreshDisplay()
-                updateStatus()
                 Toast.makeText(this, "Archive cleared permanently", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
             }
@@ -790,7 +780,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 saveAllSms()
                 refreshDisplay()
-                updateStatus()
                 Toast.makeText(this, "$tagDisplayName folder cleared", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
@@ -828,7 +817,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 saveAllSms()
                 refreshDisplay()
-                updateStatus()
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -961,16 +949,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateStatus() {
-        val hasPermissions = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-        val inboxCount = smsList.count { !it.isArchived && it.tags.isEmpty() }
-        val savedCount = smsList.count { !it.isArchived && it.tags.contains("saved") }
-        val receiptsCount = smsList.count { !it.isArchived && it.tags.contains("receipts") }
-        val archiveCount = smsList.count { it.isArchived }
-
-        statusText.text = if (hasPermissions) {
-            "✓ SMS Receiver Active\nInbox: $inboxCount | Saved: $savedCount | Receipts: $receiptsCount | Archive: $archiveCount"
-        } else {
-            "⚠ Permissions needed\nInbox: $inboxCount | Saved: $savedCount | Receipts: $receiptsCount | Archive: $archiveCount"
-        }
+        // Status text is hidden - counts shown in tab titles
     }
 }
