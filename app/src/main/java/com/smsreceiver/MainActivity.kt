@@ -1028,7 +1028,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Create checkboxes for default and custom tags
-        val allTags = listOf("saved", "receipts") + customTags
+        val allTags = listOf("saved", "receipts", "spam") + customTags
         val checkboxes = mutableMapOf<String, CheckBox>()
 
         for (tag in allTags) {
@@ -1090,6 +1090,12 @@ class MainActivity : AppCompatActivity() {
             checkbox.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
                     sms.tags.add(tag)
+
+                    // Special handling for spam tag
+                    if (tag == "spam") {
+                        dialog.dismiss()
+                        showAddToSpamListDialog(sms.sender)
+                    }
                 } else {
                     sms.tags.remove(tag)
                 }
@@ -1097,11 +1103,41 @@ class MainActivity : AppCompatActivity() {
                 refreshDisplay()
                 val action = if (isChecked) "added" else "removed"
                 Toast.makeText(this, "${tag.capitalize()} tag $action", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
+
+                if (tag != "spam") {
+                    dialog.dismiss()
+                }
             }
         }
 
         dialog.show()
+    }
+
+    private fun showAddToSpamListDialog(sender: String) {
+        // Check if sender is already in spam list
+        val spamPrefs = getSharedPreferences("spam_settings", Context.MODE_PRIVATE)
+        val spamSendersString = spamPrefs.getString("spam_senders", "") ?: ""
+        val spamSenders = if (spamSendersString.isNotEmpty()) {
+            spamSendersString.split(",").toMutableSet()
+        } else {
+            mutableSetOf()
+        }
+
+        if (spamSenders.contains(sender)) {
+            // Already in spam list
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Add to Spam List?")
+            .setMessage("Add \"$sender\" to spam list?\n\nFuture messages from this sender will automatically be marked as spam.")
+            .setPositiveButton("Add to Spam List") { _, _ ->
+                spamSenders.add(sender)
+                spamPrefs.edit().putString("spam_senders", spamSenders.joinToString(",")).apply()
+                Toast.makeText(this, "\"$sender\" added to spam list", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Skip", null)
+            .show()
     }
 
     private fun applyAutoTagging(sms: SmsData) {
@@ -1109,6 +1145,16 @@ class MainActivity : AppCompatActivity() {
         val receiptKeywords = listOf("חשבונית", "קבלה", "שובר")
         if (receiptKeywords.any { sms.message.contains(it, ignoreCase = true) }) {
             sms.tags.add("receipts")
+        }
+
+        // Auto-tag spam based on spam sender list
+        val spamPrefs = getSharedPreferences("spam_settings", Context.MODE_PRIVATE)
+        val spamSendersString = spamPrefs.getString("spam_senders", "") ?: ""
+        if (spamSendersString.isNotEmpty()) {
+            val spamSenders = spamSendersString.split(",").toSet()
+            if (spamSenders.contains(sms.sender)) {
+                sms.tags.add("spam")
+            }
         }
     }
 

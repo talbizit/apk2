@@ -29,8 +29,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var tagListContainer: LinearLayout
     private lateinit var addTagButton: Button
     private lateinit var manageTrashButton: Button
+    private lateinit var manageSpamButton: Button
 
-    private val defaultTags = setOf("saved", "receipts", "archived")
+    private val defaultTags = setOf("saved", "receipts", "archived", "spam")
     private val customTags = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,6 +54,7 @@ class SettingsActivity : AppCompatActivity() {
         tagListContainer = findViewById(R.id.tagListContainer)
         addTagButton = findViewById(R.id.addTagButton)
         manageTrashButton = findViewById(R.id.manageTrashButton)
+        manageSpamButton = findViewById(R.id.manageSpamButton)
 
         // Load saved settings
         loadSettings()
@@ -72,6 +74,11 @@ class SettingsActivity : AppCompatActivity() {
         // Manage trash button click handler
         manageTrashButton.setOnClickListener {
             showTrashManagementDialog()
+        }
+
+        // Manage spam button click handler
+        manageSpamButton.setOnClickListener {
+            showSpamManagementDialog()
         }
     }
 
@@ -519,6 +526,91 @@ class SettingsActivity : AppCompatActivity() {
             "${sms.timestamp}|${sms.sender}|$escapedMessage|0|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString|$isReadString"
         }
         prefs.edit().putString("messages", smsData).apply()
+    }
+
+    private fun showSpamManagementDialog() {
+        // Load spam senders list
+        val spamPrefs = getSharedPreferences("spam_settings", Context.MODE_PRIVATE)
+        val spamSendersString = spamPrefs.getString("spam_senders", "") ?: ""
+        val spamSenders = if (spamSendersString.isNotEmpty()) {
+            spamSendersString.split(",").toMutableSet()
+        } else {
+            mutableSetOf()
+        }
+
+        if (spamSenders.isEmpty()) {
+            Toast.makeText(this, "No spam senders", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Create dialog layout
+        val scrollView = ScrollView(this)
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 20, 40, 20)
+        }
+        scrollView.addView(layout)
+
+        // Add header
+        val headerText = TextView(this).apply {
+            text = "Select senders to remove from spam list"
+            textSize = 14f
+            setPadding(0, 0, 0, 20)
+        }
+        layout.addView(headerText)
+
+        // Create checkboxes for each spam sender
+        val checkboxes = mutableMapOf<String, CheckBox>()
+        for (sender in spamSenders.sorted()) {
+            val checkbox = CheckBox(this).apply {
+                text = sender
+                textSize = 16f
+                setPadding(0, 10, 0, 10)
+            }
+            checkboxes[sender] = checkbox
+            layout.addView(checkbox)
+        }
+
+        // Create dialog
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Spam Senders (${spamSenders.size})")
+            .setView(scrollView)
+            .setPositiveButton("Remove Selected", null)
+            .setNeutralButton("Clear All", null)
+            .setNegativeButton("✕ Cancel", null)
+            .create()
+
+        dialog.setOnShowListener {
+            // Remove Selected button
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val selectedSenders = checkboxes.filter { it.value.isChecked }.keys
+                if (selectedSenders.isEmpty()) {
+                    Toast.makeText(this, "No senders selected", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                spamSenders.removeAll(selectedSenders)
+                spamPrefs.edit().putString("spam_senders", spamSenders.joinToString(",")).apply()
+                Toast.makeText(this, "${selectedSenders.size} sender(s) removed from spam list", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+
+            // Clear All button
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                AlertDialog.Builder(this)
+                    .setTitle("Clear Spam List")
+                    .setMessage("Remove all ${spamSenders.size} sender(s) from spam list?")
+                    .setPositiveButton("Clear All") { _, _ ->
+                        spamPrefs.edit().putString("spam_senders", "").apply()
+                        Toast.makeText(this, "Spam list cleared", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+
+        dialog.show()
     }
 
     override fun onSupportNavigateUp(): Boolean {
