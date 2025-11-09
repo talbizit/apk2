@@ -243,6 +243,38 @@
             android:layout_marginTop="24dp"
             android:layout_marginBottom="24dp" />
 
+        <!-- Trash Management Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Trash"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Messages deleted from Archive are moved to Trash. Manage and permanently delete them here."
+            android:textSize="13sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:paddingBottom="16dp" />
+
+        <Button
+            android:id="@+id/manageTrashButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🗑️ Manage Trash"
+            android:layout_marginBottom="16dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="24dp" />
+
         <!-- Save Button -->
         <Button
             android:id="@+id/saveButton"

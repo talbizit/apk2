@@ -5,8 +5,10 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -26,6 +28,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var saveButton: Button
     private lateinit var tagListContainer: LinearLayout
     private lateinit var addTagButton: Button
+    private lateinit var manageTrashButton: Button
 
     private val defaultTags = setOf("saved", "receipts", "archived")
     private val customTags = mutableSetOf<String>()
@@ -49,6 +52,7 @@ class SettingsActivity : AppCompatActivity() {
         saveButton = findViewById(R.id.saveButton)
         tagListContainer = findViewById(R.id.tagListContainer)
         addTagButton = findViewById(R.id.addTagButton)
+        manageTrashButton = findViewById(R.id.manageTrashButton)
 
         // Load saved settings
         loadSettings()
@@ -63,6 +67,11 @@ class SettingsActivity : AppCompatActivity() {
         // Add tag button click handler
         addTagButton.setOnClickListener {
             showAddTagDialog()
+        }
+
+        // Manage trash button click handler
+        manageTrashButton.setOnClickListener {
+            showTrashManagementDialog()
         }
     }
 
@@ -359,6 +368,157 @@ class SettingsActivity : AppCompatActivity() {
 
         Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show()
         finish()
+    }
+
+    private fun showTrashManagementDialog() {
+        // Load all SMS messages
+        val smsList = loadStoredSms()
+        val trashMessages = smsList.filter { it.tags.contains("trash") }
+
+        if (trashMessages.isEmpty()) {
+            Toast.makeText(this, "Trash is empty", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Create dialog layout
+        val scrollView = ScrollView(this)
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 20, 40, 20)
+        }
+        scrollView.addView(layout)
+
+        // Add header
+        val headerText = TextView(this).apply {
+            text = "Select messages to permanently delete"
+            textSize = 14f
+            setPadding(0, 0, 0, 20)
+        }
+        layout.addView(headerText)
+
+        // Create checkboxes for each message
+        val checkboxes = mutableMapOf<SmsData, CheckBox>()
+        for (sms in trashMessages) {
+            val checkbox = CheckBox(this).apply {
+                text = "${sms.sender}\n${sms.message.take(50)}${if (sms.message.length > 50) "..." else ""}\n${sms.timestamp}"
+                textSize = 13f
+                setPadding(0, 10, 0, 10)
+            }
+            checkboxes[sms] = checkbox
+            layout.addView(checkbox)
+        }
+
+        // Create dialog
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Trash (${trashMessages.size} messages)")
+            .setView(scrollView)
+            .setPositiveButton("🗑️ Delete Selected", null)
+            .setNeutralButton("🗑️ Empty Trash", null)
+            .setNegativeButton("✕ Cancel", null)
+            .create()
+
+        dialog.setOnShowListener {
+            // Delete Selected button
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val selectedMessages = checkboxes.filter { it.value.isChecked }.keys
+                if (selectedMessages.isEmpty()) {
+                    Toast.makeText(this, "No messages selected", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                AlertDialog.Builder(this)
+                    .setTitle("Confirm Permanent Delete")
+                    .setMessage("Permanently delete ${selectedMessages.size} message(s)? This cannot be undone.")
+                    .setPositiveButton("Delete") { _, _ ->
+                        deleteMessagesFromStorage(selectedMessages.toList())
+                        Toast.makeText(this, "${selectedMessages.size} message(s) permanently deleted", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+
+            // Empty Trash button
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                AlertDialog.Builder(this)
+                    .setTitle("Confirm Empty Trash")
+                    .setMessage("Permanently delete all ${trashMessages.size} message(s) in Trash? This cannot be undone.")
+                    .setPositiveButton("Empty Trash") { _, _ ->
+                        deleteMessagesFromStorage(trashMessages)
+                        Toast.makeText(this, "Trash emptied (${trashMessages.size} messages deleted)", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+
+        dialog.show()
+    }
+
+    private fun loadStoredSms(): MutableList<SmsData> {
+        val smsList = mutableListOf<SmsData>()
+        val prefs = getSharedPreferences("sms_data", Context.MODE_PRIVATE)
+        val smsData = prefs.getString("messages", "") ?: ""
+
+        if (smsData.isNotEmpty()) {
+            val lines = smsData.split("\n")
+            for (line in lines) {
+                if (line.isEmpty()) continue
+                val parts = line.split("|")
+                if (parts.size >= 7) {
+                    val timestampMillis = if (parts.size > 5) parts[5].toLongOrNull() ?: 0L else 0L
+                    val archiveTimestamp = if (parts.size > 4) parts[4].toLongOrNull() ?: 0L else 0L
+
+                    // Parse tags
+                    val tagsString = if (parts.size > 6) parts[6] else ""
+                    val tags = if (tagsString.isNotEmpty()) {
+                        tagsString.split(",").toMutableSet()
+                    } else {
+                        mutableSetOf()
+                    }
+
+                    // Parse isRead
+                    val isRead = if (parts.size > 7) parts[7] == "1" else false
+
+                    // Unescape message
+                    val escapedMessage = parts[2]
+                    val unescapedMessage = escapedMessage
+                        .replace("\\n", "\n")
+                        .replace("\\|", "|")
+
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags, isRead))
+                }
+            }
+        }
+        return smsList
+    }
+
+    private fun deleteMessagesFromStorage(messagesToDelete: List<SmsData>) {
+        val smsList = loadStoredSms()
+        smsList.removeAll { sms ->
+            messagesToDelete.any {
+                it.sender == sms.sender &&
+                it.message == sms.message &&
+                it.timestamp == sms.timestamp
+            }
+        }
+        saveAllSms(smsList)
+    }
+
+    private fun saveAllSms(smsList: List<SmsData>) {
+        val prefs = getSharedPreferences("sms_data", Context.MODE_PRIVATE)
+        val smsData = smsList.joinToString("\n") { sms ->
+            val escapedMessage = sms.message
+                .replace("|", "\\|")
+                .replace("\n", "\\n")
+
+            val tagsString = sms.tags.joinToString(",")
+            val isReadString = if (sms.isRead) "1" else "0"
+
+            "${sms.timestamp}|${sms.sender}|$escapedMessage|0|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString|$isReadString"
+        }
+        prefs.edit().putString("messages", smsData).apply()
     }
 
     override fun onSupportNavigateUp(): Boolean {

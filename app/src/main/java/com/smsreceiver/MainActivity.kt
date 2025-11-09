@@ -139,11 +139,25 @@ class MainActivity : AppCompatActivity() {
         deleteButton.setOnClickListener {
             val selectedItems = groupedAdapter.getSelectedItems()
             if (selectedItems.isNotEmpty()) {
-                smsList.removeAll { sms -> selectedItems.any { it.sender == sms.sender && it.message == sms.message && it.timestamp == sms.timestamp } }
-                saveAllSms()
-                exitSelectionMode()
-                refreshDisplay()
-                Toast.makeText(this, "${selectedItems.size} message(s) deleted permanently", Toast.LENGTH_SHORT).show()
+                AlertDialog.Builder(this)
+                    .setTitle("Delete Messages")
+                    .setMessage("Move ${selectedItems.size} message(s) to Trash?\n\nMessages can be permanently deleted from Settings → Trash.")
+                    .setPositiveButton("🗑️ Move to Trash") { _, _ ->
+                        // Move selected messages to trash
+                        for (selectedMsg in selectedItems) {
+                            val sms = smsList.find { it.sender == selectedMsg.sender && it.message == selectedMsg.message && it.timestamp == selectedMsg.timestamp }
+                            sms?.let {
+                                it.tags.add("trash")
+                            }
+                        }
+                        saveAllSms()
+                        exitSelectionMode()
+                        refreshDisplay()
+                        Toast.makeText(this, "${selectedItems.size} message(s) moved to Trash", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("✕ Cancel", null)
+                    .create()
+                    .show()
             }
         }
 
@@ -531,10 +545,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTabTitles() {
-        val inboxMessages = smsList.filter { it.tags.isEmpty() }
-        val savedMessages = smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") }
-        val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") }
-        val archiveMessages = smsList.filter { it.tags.contains("archived") }
+        val inboxMessages = smsList.filter { it.tags.isEmpty() && !it.tags.contains("trash") }
+        val savedMessages = smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") && !it.tags.contains("trash") }
+        val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") && !it.tags.contains("trash") }
+        val archiveMessages = smsList.filter { it.tags.contains("archived") && !it.tags.contains("trash") }
 
         val inboxCount = inboxMessages.size
         val inboxUnread = inboxMessages.count { !it.isRead }
@@ -560,28 +574,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun groupByInbox(): List<ListItem> {
-        // Inbox = messages with no tags at all
-        val inboxMessages = smsList.filter { it.tags.isEmpty() }
+        // Inbox = messages with no tags at all (excluding trash)
+        val inboxMessages = smsList.filter { it.tags.isEmpty() && !it.tags.contains("trash") }
         return groupBySender(inboxMessages)
     }
 
     private fun groupBySaved(): List<ListItem> {
-        // Saved = messages with "saved" tag BUT NOT archived
-        // Archived messages only appear in Archive tab
-        val savedMessages = smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") }
+        // Saved = messages with "saved" tag BUT NOT archived or trash
+        // Archived and trash messages only appear in Archive/Trash tabs
+        val savedMessages = smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") && !it.tags.contains("trash") }
         return groupBySender(savedMessages)
     }
 
     private fun groupByReceipts(): List<ListItem> {
-        // Receipts = messages with "receipts" tag BUT NOT archived
-        // Archived messages only appear in Archive tab
-        val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") }
+        // Receipts = messages with "receipts" tag BUT NOT archived or trash
+        // Archived and trash messages only appear in Archive/Trash tabs
+        val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") && !it.tags.contains("trash") }
         return groupBySender(receiptsMessages)
     }
 
     private fun groupByArchive(): List<ListItem> {
-        // Archive = messages with "archived" tag (may have other tags too)
-        val archivedMessages = smsList.filter { it.tags.contains("archived") }
+        // Archive = messages with "archived" tag BUT NOT trash (may have other tags too)
+        val archivedMessages = smsList.filter { it.tags.contains("archived") && !it.tags.contains("trash") }
         return groupByTimeCategories(archivedMessages)
     }
 
@@ -762,26 +776,32 @@ class MainActivity : AppCompatActivity() {
     private fun handleItemLongClick(position: Int): Boolean {
         val item = groupedAdapter.getItemAtPosition(position)
 
-        // For messages in Archive tab: show simplified delete dialog
-        if (item is ListItem.Message && currentTab == 3) {
-            showArchiveDeleteDialog(item.sms)
-            return true
-        }
-
-        // For messages in other tabs: show full tags dialog
-        if (item is ListItem.Message) {
+        // For messages in other tabs (not Archive): show full tags dialog
+        if (item is ListItem.Message && currentTab != 3) {
             showMoveToDialog(item.sms)
             return true
         }
 
-        // For headers in Archive tab: multi-select delete mode
-        if (!isSelectionMode && currentTab == 3 && item is ListItem.Header) {
-            enterSelectionMode()
-            item.isSelected = true
-            selectGroupItems(position, true)
-            groupedAdapter.notifyDataSetChanged()
-            updateSelectionCount()
-            return true
+        // For Archive tab: enter selection mode for both headers and messages
+        if (currentTab == 3 && !isSelectionMode) {
+            when (item) {
+                is ListItem.Header -> {
+                    enterSelectionMode()
+                    item.isSelected = true
+                    selectGroupItems(position, true)
+                    groupedAdapter.notifyDataSetChanged()
+                    updateSelectionCount()
+                    return true
+                }
+                is ListItem.Message -> {
+                    enterSelectionMode()
+                    item.isSelected = true
+                    groupedAdapter.notifyDataSetChanged()
+                    updateSelectionCount()
+                    return true
+                }
+                else -> {}
+            }
         }
 
         return false
@@ -1082,21 +1102,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
-    }
-
-    private fun showArchiveDeleteDialog(sms: SmsData) {
-        AlertDialog.Builder(this)
-            .setTitle("Delete Message")
-            .setMessage("Permanently delete this message?\n\nFrom: ${sms.sender}\nTime: ${sms.timestamp}")
-            .setPositiveButton("🗑️ Delete") { _, _ ->
-                smsList.remove(sms)
-                saveAllSms()
-                refreshDisplay()
-                Toast.makeText(this, "Message deleted permanently", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("✕ Cancel", null)
-            .create()
-            .show()
     }
 
     private fun applyAutoTagging(sms: SmsData) {
