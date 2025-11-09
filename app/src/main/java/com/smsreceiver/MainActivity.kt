@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.ContactsContract
 import android.provider.Telephony
 import android.text.Editable
 import android.text.TextWatcher
@@ -119,7 +120,9 @@ class MainActivity : AppCompatActivity() {
             items = mutableListOf(),
             onItemClick = { position -> handleItemClick(position) },
             onItemLongClick = { position -> handleItemLongClick(position) },
-            onRefreshNeeded = { refreshDisplay() }
+            onRefreshNeeded = { refreshDisplay() },
+            onSenderClick = { sender -> handleSenderClick(sender) },
+            getContactName = { phoneNumber -> getContactName(phoneNumber) }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = groupedAdapter
@@ -269,6 +272,11 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
             != PackageManager.PERMISSION_GRANTED) {
             permissionsNeeded.add(Manifest.permission.SEND_SMS)
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS)
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.READ_CONTACTS)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1184,6 +1192,82 @@ class MainActivity : AppCompatActivity() {
         } else {
             archiveAllButton.setTextColor(0xFFB0B0B0.toInt())
             archiveSpamButton.setTextColor(0xFFFFFFFF.toInt())
+        }
+    }
+
+    private fun handleSenderClick(sender: String) {
+        // Check if sender is a contact
+        val contactName = getContactName(sender)
+        if (contactName == null) {
+            // Not a contact, show dialog to add
+            showAddContactDialog(sender)
+        } else {
+            // Already a contact, show toast
+            Toast.makeText(this, "Contact: $contactName", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun getContactName(phoneNumber: String): String? {
+        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber))
+        val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+
+        try {
+            contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        return cursor.getString(nameIndex)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
+
+    private fun showAddContactDialog(phoneNumber: String) {
+        val input = EditText(this).apply {
+            hint = "Contact name"
+            setPadding(40, 20, 40, 20)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Add Contact")
+            .setMessage("Add \"$phoneNumber\" to contacts?")
+            .setView(input)
+            .setPositiveButton("Add") { _, _ ->
+                val contactName = input.text.toString().trim()
+                if (contactName.isNotEmpty()) {
+                    addContact(contactName, phoneNumber)
+                } else {
+                    Toast.makeText(this, "Please enter a name", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun addContact(name: String, phoneNumber: String) {
+        try {
+            val intent = Intent(Intent.ACTION_INSERT).apply {
+                type = ContactsContract.Contacts.CONTENT_TYPE
+                putExtra(ContactsContract.Intents.Insert.NAME, name)
+                putExtra(ContactsContract.Intents.Insert.PHONE, phoneNumber)
+            }
+            startActivityForResult(intent, 1001)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "Failed to add contact", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1001 && resultCode == RESULT_OK) {
+            // Contact was added, refresh display to show names
+            Toast.makeText(this, "Contact added", Toast.LENGTH_SHORT).show()
+            refreshDisplay()
         }
     }
 

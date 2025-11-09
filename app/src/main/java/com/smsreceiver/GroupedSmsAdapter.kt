@@ -18,7 +18,9 @@ class GroupedSmsAdapter(
     private val items: MutableList<ListItem>,
     private val onItemClick: (Int) -> Unit,
     private val onItemLongClick: (Int) -> Boolean,
-    private val onRefreshNeeded: () -> Unit
+    private val onRefreshNeeded: () -> Unit,
+    private val onSenderClick: (String) -> Unit,
+    private val getContactName: (String) -> String?
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -98,7 +100,9 @@ class GroupedSmsAdapter(
             }
             is ListItem.Message -> {
                 val messageHolder = holder as MessageViewHolder
-                messageHolder.senderText.text = item.sms.sender
+                // Display contact name if available, otherwise show phone number
+                val displayName = getContactName(item.sms.sender) ?: item.sms.sender
+                messageHolder.senderText.text = displayName
                 messageHolder.messageText.text = item.sms.message
                 messageHolder.timestampText.text = item.sms.timestamp
 
@@ -120,6 +124,13 @@ class GroupedSmsAdapter(
                 messageHolder.checkBox.setOnCheckedChangeListener(null) // Remove old listener
                 messageHolder.checkBox.setOnCheckedChangeListener { _, isChecked ->
                     item.isSelected = isChecked
+                }
+
+                // Set click listener on sender to add/view contact
+                messageHolder.senderText.setOnClickListener {
+                    if (!isSelectionMode) {
+                        onSenderClick(item.sms.sender)
+                    }
                 }
 
                 // Set long-press on the entire card
