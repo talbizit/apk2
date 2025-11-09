@@ -75,14 +75,45 @@
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Spam" />
-
-        <com.google.android.material.tabs.TabItem
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:text="Archive" />
 
     </com.google.android.material.tabs.TabLayout>
+
+    <!-- Archive Subfolder Row (visible only when Archive tab selected) -->
+    <LinearLayout
+        android:id="@+id/archiveSubfolderRow"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_below="@id/tabLayout"
+        android:orientation="horizontal"
+        android:background="#2A2A2A"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/archiveAllButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="All"
+            android:textSize="14sp"
+            android:background="?android:attr/selectableItemBackground"
+            android:textColor="#B0B0B0"
+            style="?android:attr/borderlessButtonStyle" />
+
+        <Button
+            android:id="@+id/archiveSpamButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="Spam"
+            android:textSize="14sp"
+            android:background="?android:attr/selectableItemBackground"
+            android:textColor="#B0B0B0"
+            style="?android:attr/borderlessButtonStyle" />
+
+    </LinearLayout>
 
     <!-- Hidden status text for compatibility -->
     <TextView
@@ -116,7 +147,7 @@
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/tabLayout"
+        android:layout_below="@id/archiveSubfolderRow"
         android:clipToPadding="false"
         android:padding="8dp" />
 

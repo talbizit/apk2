@@ -53,6 +53,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settingsButton: Button
     private lateinit var markAllReadButton: Button
     private lateinit var tabLayout: TabLayout
+    private lateinit var archiveSubfolderRow: LinearLayout
+    private lateinit var archiveAllButton: Button
+    private lateinit var archiveSpamButton: Button
     private val smsList = mutableListOf<SmsData>()
 
     private val SMS_PERMISSION_CODE = 100
@@ -62,8 +65,11 @@ class MainActivity : AppCompatActivity() {
     private var smsObserver: ContentObserver? = null
     private var lastSmsId = 0L
 
-    // Track current tab (0 = Inbox, 1 = Saved, 2 = Receipts, 3 = Spam, 4 = Archive)
+    // Track current tab (0 = Inbox, 1 = Saved, 2 = Receipts, 3 = Archive)
     private var currentTab = 0
+
+    // Track Archive subfolder (0 = All, 1 = Spam)
+    private var archiveSubfolder = 0
 
     // Viewport tracking for auto-read
     private val viewportHandler = Handler(Looper.getMainLooper())
@@ -105,6 +111,9 @@ class MainActivity : AppCompatActivity() {
         settingsButton = findViewById(R.id.settingsButton)
         markAllReadButton = findViewById(R.id.markAllReadButton)
         tabLayout = findViewById(R.id.tabLayout)
+        archiveSubfolderRow = findViewById(R.id.archiveSubfolderRow)
+        archiveAllButton = findViewById(R.id.archiveAllButton)
+        archiveSpamButton = findViewById(R.id.archiveSpamButton)
 
         groupedAdapter = GroupedSmsAdapter(
             items = mutableListOf(),
@@ -125,6 +134,16 @@ class MainActivity : AppCompatActivity() {
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 currentTab = tab?.position ?: 0
+
+                // Show/hide archive subfolder row
+                if (currentTab == 3) {
+                    archiveSubfolderRow.visibility = View.VISIBLE
+                    archiveSubfolder = 0  // Reset to "All"
+                    updateArchiveSubfolderButtons()
+                } else {
+                    archiveSubfolderRow.visibility = View.GONE
+                }
+
                 updateClearButtonText()
                 refreshDisplay()
             }
@@ -132,6 +151,19 @@ class MainActivity : AppCompatActivity() {
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
             override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
+
+        // Setup archive subfolder buttons
+        archiveAllButton.setOnClickListener {
+            archiveSubfolder = 0
+            updateArchiveSubfolderButtons()
+            refreshDisplay()
+        }
+
+        archiveSpamButton.setOnClickListener {
+            archiveSubfolder = 1
+            updateArchiveSubfolderButtons()
+            refreshDisplay()
+        }
 
         // Clear button is now hidden - functionality moved to long-press menu
         clearButton.setOnClickListener { }
@@ -522,8 +554,7 @@ class MainActivity : AppCompatActivity() {
             0 -> groupByInbox()      // No tags + not archived
             1 -> groupBySaved()      // "saved" tag + not archived
             2 -> groupByReceipts()   // "receipts" tag + not archived
-            3 -> groupBySpam()       // "spam" tag + not archived
-            4 -> groupByArchive()    // Archived (tags preserved)
+            3 -> groupByArchive()    // Archived (filtered by subfolder)
             else -> groupByInbox()
         }
 
@@ -533,8 +564,7 @@ class MainActivity : AppCompatActivity() {
                 0 -> "No messages in Inbox"
                 1 -> "No saved messages"
                 2 -> "No receipts"
-                3 -> "No spam messages"
-                4 -> "Archive is empty"
+                3 -> if (archiveSubfolder == 1) "No spam in Archive" else "Archive is empty"
                 else -> "No messages"
             }
             val emptyItems = listOf(ListItem.Header(emptyMessage))
@@ -550,7 +580,6 @@ class MainActivity : AppCompatActivity() {
         val inboxMessages = smsList.filter { it.tags.isEmpty() && !it.tags.contains("trash") }
         val savedMessages = smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") && !it.tags.contains("trash") }
         val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") && !it.tags.contains("trash") }
-        val spamMessages = smsList.filter { it.tags.contains("spam") && !it.tags.contains("archived") && !it.tags.contains("trash") }
         val archiveMessages = smsList.filter { it.tags.contains("archived") && !it.tags.contains("trash") }
 
         val inboxCount = inboxMessages.size
@@ -559,16 +588,13 @@ class MainActivity : AppCompatActivity() {
         val savedUnread = savedMessages.count { !it.isRead }
         val receiptsCount = receiptsMessages.size
         val receiptsUnread = receiptsMessages.count { !it.isRead }
-        val spamCount = spamMessages.size
-        val spamUnread = spamMessages.count { !it.isRead }
         val archiveCount = archiveMessages.size
         val archiveUnread = archiveMessages.count { !it.isRead }
 
         tabLayout.getTabAt(0)?.text = formatTabTitle("Inbox", inboxCount, inboxUnread)
         tabLayout.getTabAt(1)?.text = formatTabTitle("Saved", savedCount, savedUnread)
         tabLayout.getTabAt(2)?.text = formatTabTitle("Receipts", receiptsCount, receiptsUnread)
-        tabLayout.getTabAt(3)?.text = formatTabTitle("Spam", spamCount, spamUnread)
-        tabLayout.getTabAt(4)?.text = formatTabTitle("Archive", archiveCount, archiveUnread)
+        tabLayout.getTabAt(3)?.text = formatTabTitle("Archive", archiveCount, archiveUnread)
     }
 
     private fun formatTabTitle(name: String, total: Int, unread: Int): String {
@@ -599,16 +625,13 @@ class MainActivity : AppCompatActivity() {
         return groupBySender(receiptsMessages)
     }
 
-    private fun groupBySpam(): List<ListItem> {
-        // Spam = messages with "spam" tag BUT NOT archived or trash
-        // Archived and trash messages only appear in Archive/Trash tabs
-        val spamMessages = smsList.filter { it.tags.contains("spam") && !it.tags.contains("archived") && !it.tags.contains("trash") }
-        return groupBySender(spamMessages)
-    }
-
     private fun groupByArchive(): List<ListItem> {
         // Archive = messages with "archived" tag BUT NOT trash (may have other tags too)
-        val archivedMessages = smsList.filter { it.tags.contains("archived") && !it.tags.contains("trash") }
+        // Filtered by subfolder: 0 = All, 1 = Spam only
+        val archivedMessages = smsList.filter {
+            it.tags.contains("archived") && !it.tags.contains("trash") &&
+            (archiveSubfolder == 0 || (archiveSubfolder == 1 && it.tags.contains("spam")))
+        }
         return groupByTimeCategories(archivedMessages)
     }
 
@@ -1151,6 +1174,17 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Skip", null)
             .show()
+    }
+
+    private fun updateArchiveSubfolderButtons() {
+        // Highlight selected subfolder button
+        if (archiveSubfolder == 0) {
+            archiveAllButton.setTextColor(0xFFFFFFFF.toInt())
+            archiveSpamButton.setTextColor(0xFFB0B0B0.toInt())
+        } else {
+            archiveAllButton.setTextColor(0xFFB0B0B0.toInt())
+            archiveSpamButton.setTextColor(0xFFFFFFFF.toInt())
+        }
     }
 
     private fun applyAutoTagging(sms: SmsData) {
