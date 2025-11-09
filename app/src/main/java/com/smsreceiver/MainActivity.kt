@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity() {
     private var smsObserver: ContentObserver? = null
     private var lastSmsId = 0L
 
-    // Track current tab (0 = Inbox, 1 = Saved, 2 = Receipts, 3 = Archive)
+    // Track current tab (0 = Inbox, 1 = Saved, 2 = Receipts, 3 = Spam, 4 = Archive)
     private var currentTab = 0
 
     // Viewport tracking for auto-read
@@ -522,7 +522,8 @@ class MainActivity : AppCompatActivity() {
             0 -> groupByInbox()      // No tags + not archived
             1 -> groupBySaved()      // "saved" tag + not archived
             2 -> groupByReceipts()   // "receipts" tag + not archived
-            3 -> groupByArchive()    // Archived (tags preserved)
+            3 -> groupBySpam()       // "spam" tag + not archived
+            4 -> groupByArchive()    // Archived (tags preserved)
             else -> groupByInbox()
         }
 
@@ -532,7 +533,8 @@ class MainActivity : AppCompatActivity() {
                 0 -> "No messages in Inbox"
                 1 -> "No saved messages"
                 2 -> "No receipts"
-                3 -> "Archive is empty"
+                3 -> "No spam messages"
+                4 -> "Archive is empty"
                 else -> "No messages"
             }
             val emptyItems = listOf(ListItem.Header(emptyMessage))
@@ -548,6 +550,7 @@ class MainActivity : AppCompatActivity() {
         val inboxMessages = smsList.filter { it.tags.isEmpty() && !it.tags.contains("trash") }
         val savedMessages = smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") && !it.tags.contains("trash") }
         val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") && !it.tags.contains("trash") }
+        val spamMessages = smsList.filter { it.tags.contains("spam") && !it.tags.contains("archived") && !it.tags.contains("trash") }
         val archiveMessages = smsList.filter { it.tags.contains("archived") && !it.tags.contains("trash") }
 
         val inboxCount = inboxMessages.size
@@ -556,13 +559,16 @@ class MainActivity : AppCompatActivity() {
         val savedUnread = savedMessages.count { !it.isRead }
         val receiptsCount = receiptsMessages.size
         val receiptsUnread = receiptsMessages.count { !it.isRead }
+        val spamCount = spamMessages.size
+        val spamUnread = spamMessages.count { !it.isRead }
         val archiveCount = archiveMessages.size
         val archiveUnread = archiveMessages.count { !it.isRead }
 
         tabLayout.getTabAt(0)?.text = formatTabTitle("Inbox", inboxCount, inboxUnread)
         tabLayout.getTabAt(1)?.text = formatTabTitle("Saved", savedCount, savedUnread)
         tabLayout.getTabAt(2)?.text = formatTabTitle("Receipts", receiptsCount, receiptsUnread)
-        tabLayout.getTabAt(3)?.text = formatTabTitle("Archive", archiveCount, archiveUnread)
+        tabLayout.getTabAt(3)?.text = formatTabTitle("Spam", spamCount, spamUnread)
+        tabLayout.getTabAt(4)?.text = formatTabTitle("Archive", archiveCount, archiveUnread)
     }
 
     private fun formatTabTitle(name: String, total: Int, unread: Int): String {
@@ -591,6 +597,13 @@ class MainActivity : AppCompatActivity() {
         // Archived and trash messages only appear in Archive/Trash tabs
         val receiptsMessages = smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") && !it.tags.contains("trash") }
         return groupBySender(receiptsMessages)
+    }
+
+    private fun groupBySpam(): List<ListItem> {
+        // Spam = messages with "spam" tag BUT NOT archived or trash
+        // Archived and trash messages only appear in Archive/Trash tabs
+        val spamMessages = smsList.filter { it.tags.contains("spam") && !it.tags.contains("archived") && !it.tags.contains("trash") }
+        return groupBySender(spamMessages)
     }
 
     private fun groupByArchive(): List<ListItem> {
