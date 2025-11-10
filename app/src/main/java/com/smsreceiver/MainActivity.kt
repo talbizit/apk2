@@ -230,7 +230,7 @@ class MainActivity : AppCompatActivity() {
                 AlertDialog.Builder(this)
                     .setTitle("Mark All as Read")
                     .setMessage("Mark $unreadCount unread message(s) in $folderName as read?")
-                    .setPositiveButton("✉ Mark Read") { _, _ ->
+                    .setPositiveButton("📭 Mark as Read") { _, _ ->
                         currentFolderMessages.forEach { it.isRead = true }
                         saveAllSms()
                         refreshDisplay()
@@ -1082,7 +1082,7 @@ class MainActivity : AppCompatActivity() {
 
         // Mark Read/Unread button
         val readButton = Button(this).apply {
-            text = if (sms.isRead) "✉️ Mark Unread" else "✓ Mark Read"
+            text = if (sms.isRead) "📩 Mark as Unread" else "📭 Mark as Read"
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -1238,20 +1238,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getContactName(phoneNumber: String): String? {
-        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber))
-        val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+        // Try multiple lookup strategies for better contact matching
+        val strategies = listOf(
+            phoneNumber,  // Original number
+            phoneNumber.replace(Regex("[^0-9]"), ""),  // Remove all non-digits
+            if (phoneNumber.startsWith("0")) phoneNumber.substring(1) else null,  // Remove leading 0
+            if (!phoneNumber.startsWith("+")) "+972${phoneNumber.removePrefix("0")}" else null  // Try with country code
+        ).filterNotNull()
 
-        try {
-            contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
-                    if (nameIndex >= 0) {
-                        return cursor.getString(nameIndex)
+        for (number in strategies) {
+            val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number))
+            val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+
+            try {
+                contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                        if (nameIndex >= 0) {
+                            val name = cursor.getString(nameIndex)
+                            // Return name only if it's different from the phone number
+                            if (name != null && !name.matches(Regex("[0-9+\\-\\s()]+"))) {
+                                return name
+                            }
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
         return null
     }

@@ -36,7 +36,7 @@
         android:layout_height="48dp"
         android:layout_below="@id/settingsRowContainer"
         android:orientation="horizontal"
-        android:background="#000000"
+        android:background="#3A3A3A"
         android:gravity="center"
         android:paddingStart="16dp"
         android:paddingEnd="16dp">
@@ -45,10 +45,10 @@
             android:id="@+id/markAllReadButton"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:text="✉ Mark All as Read"
+            android:text="📭 Mark All as Read"
             android:textSize="16sp"
             android:textColor="#FFFFFF"
-            android:background="#000000"
+            android:background="#3A3A3A"
             style="?android:attr/borderlessButtonStyle" />
 
     </LinearLayout>
