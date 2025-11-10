@@ -202,14 +202,44 @@ class MainActivity : AppCompatActivity() {
         }
 
         markAllReadButton.setOnClickListener {
-            val unreadCount = smsList.count { !it.isRead }
+            // Get messages in current folder only
+            val currentFolderMessages = when (currentTab) {
+                0 -> smsList.filter { it.tags.isEmpty() && !it.tags.contains("trash") }
+                1 -> smsList.filter { it.tags.contains("saved") && !it.tags.contains("archived") && !it.tags.contains("trash") }
+                2 -> smsList.filter { it.tags.contains("receipts") && !it.tags.contains("archived") && !it.tags.contains("trash") }
+                3 -> {
+                    // Archive: filter by subfolder
+                    smsList.filter {
+                        it.tags.contains("archived") && !it.tags.contains("trash") &&
+                        (archiveSubfolder == 0 || (archiveSubfolder == 1 && it.tags.contains("spam")))
+                    }
+                }
+                else -> emptyList()
+            }
+
+            val unreadCount = currentFolderMessages.count { !it.isRead }
             if (unreadCount > 0) {
-                smsList.forEach { it.isRead = true }
-                saveAllSms()
-                refreshDisplay()
-                Toast.makeText(this, "$unreadCount message(s) marked as read", Toast.LENGTH_SHORT).show()
+                val folderName = when (currentTab) {
+                    0 -> "Inbox"
+                    1 -> "Saved"
+                    2 -> "Receipts"
+                    3 -> if (archiveSubfolder == 1) "Archive (Spam)" else "Archive"
+                    else -> "folder"
+                }
+
+                AlertDialog.Builder(this)
+                    .setTitle("Mark All as Read")
+                    .setMessage("Mark $unreadCount unread message(s) in $folderName as read?")
+                    .setPositiveButton("✉ Mark Read") { _, _ ->
+                        currentFolderMessages.forEach { it.isRead = true }
+                        saveAllSms()
+                        refreshDisplay()
+                        Toast.makeText(this, "$unreadCount message(s) marked as read", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
             } else {
-                Toast.makeText(this, "All messages already read", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "No unread messages in current folder", Toast.LENGTH_SHORT).show()
             }
         }
 
