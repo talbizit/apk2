@@ -175,9 +175,9 @@ class MainActivity : AppCompatActivity() {
             val selectedItems = groupedAdapter.getSelectedItems()
             if (selectedItems.isNotEmpty()) {
                 AlertDialog.Builder(this)
-                    .setTitle("Delete Messages")
-                    .setMessage("Move ${selectedItems.size} message(s) to Trash?\n\nMessages can be permanently deleted from Settings → Trash.")
-                    .setPositiveButton("🗑️ Move to Trash") { _, _ ->
+                    .setTitle("Delete ${selectedItems.size} message(s)?")
+                    .setMessage("Are you sure?")
+                    .setPositiveButton("Delete") { _, _ ->
                         // Move selected messages to trash
                         for (selectedMsg in selectedItems) {
                             val sms = smsList.find { it.sender == selectedMsg.sender && it.message == selectedMsg.message && it.timestamp == selectedMsg.timestamp }
@@ -188,9 +188,9 @@ class MainActivity : AppCompatActivity() {
                         saveAllSms()
                         exitSelectionMode()
                         refreshDisplay()
-                        Toast.makeText(this, "${selectedItems.size} message(s) moved to Trash", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "${selectedItems.size} message(s) deleted", Toast.LENGTH_SHORT).show()
                     }
-                    .setNegativeButton("✕ Cancel", null)
+                    .setNegativeButton("Cancel", null)
                     .create()
                     .show()
             }
