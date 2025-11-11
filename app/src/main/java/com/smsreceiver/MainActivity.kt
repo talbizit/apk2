@@ -1315,13 +1315,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyAutoTagging(sms: SmsData) {
-        // Auto-tag receipts based on Hebrew keywords
-        val receiptKeywords = listOf("חשבונית", "קבלה", "שובר")
-        if (receiptKeywords.any { sms.message.contains(it, ignoreCase = true) }) {
-            sms.tags.add("receipts")
+        // Load all tag keywords from SharedPreferences
+        val keywordsPrefs = getSharedPreferences("tag_keywords", Context.MODE_PRIVATE)
+
+        // Get all possible tags (default + custom)
+        val tagPrefs = getSharedPreferences("tag_settings", Context.MODE_PRIVATE)
+        val customTagsString = tagPrefs.getString("custom_tags", "") ?: ""
+        val customTags = if (customTagsString.isNotEmpty()) {
+            customTagsString.split(",").toSet()
+        } else {
+            emptySet()
         }
 
-        // Auto-tag spam based on spam sender list
+        val defaultTags = setOf("saved", "receipts", "archived", "spam")
+        val allTags = defaultTags + customTags
+
+        // Check each tag's keywords
+        for (tag in allTags) {
+            val keywordsString = keywordsPrefs.getString(tag, "") ?: ""
+            if (keywordsString.isNotEmpty()) {
+                val keywords = keywordsString.split(",")
+                // Check if message contains any of the keywords
+                if (keywords.any { keyword ->
+                    sms.message.contains(keyword, ignoreCase = true) ||
+                    sms.sender.contains(keyword, ignoreCase = true)
+                }) {
+                    sms.tags.add(tag)
+                }
+            }
+        }
+
+        // For receipts, initialize default keywords if not set
+        if (!keywordsPrefs.contains("receipts")) {
+            val defaultReceiptKeywords = listOf("חשבונית", "קבלה", "שובר")
+            if (defaultReceiptKeywords.any { sms.message.contains(it, ignoreCase = true) }) {
+                sms.tags.add("receipts")
+            }
+        }
+
+        // Also check spam sender list for backward compatibility
         val spamPrefs = getSharedPreferences("spam_settings", Context.MODE_PRIVATE)
         val spamSendersString = spamPrefs.getString("spam_senders", "") ?: ""
         if (spamSendersString.isNotEmpty()) {

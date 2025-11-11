@@ -150,6 +150,22 @@ class SettingsActivity : AppCompatActivity() {
         }
         tagRow.addView(tagText)
 
+        // Keywords button for all tags
+        val keywordsButton = Button(this).apply {
+            text = "Keywords"
+            textSize = 12f
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = 8
+            }
+            setOnClickListener {
+                showKeywordsDialog(tag)
+            }
+        }
+        tagRow.addView(keywordsButton)
+
         if (!isDefault) {
             // Rename button
             val renameButton = Button(this).apply {
@@ -252,6 +268,15 @@ class SettingsActivity : AppCompatActivity() {
                 customTags.add(newTag)
                 saveCustomTags()
 
+                // Migrate keywords to new tag name
+                val keywords = loadTagKeywords(oldTag)
+                if (keywords.isNotEmpty()) {
+                    saveTagKeywords(newTag, keywords)
+                    // Clear old tag keywords
+                    val keywordsPrefs = getSharedPreferences("tag_keywords", Context.MODE_PRIVATE)
+                    keywordsPrefs.edit().remove(oldTag).apply()
+                }
+
                 // Rename in all messages
                 renameTagInAllMessages(oldTag, newTag)
 
@@ -269,6 +294,10 @@ class SettingsActivity : AppCompatActivity() {
             .setPositiveButton("Delete") { _, _ ->
                 customTags.remove(tag)
                 saveCustomTags()
+
+                // Remove keywords associated with this tag
+                val keywordsPrefs = getSharedPreferences("tag_keywords", Context.MODE_PRIVATE)
+                keywordsPrefs.edit().remove(tag).apply()
 
                 // Remove from all messages
                 removeTagFromAllMessages(tag)
@@ -616,5 +645,230 @@ class SettingsActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
+    }
+
+    // Keyword management functions
+    private fun loadTagKeywords(tag: String): MutableSet<String> {
+        val prefs = getSharedPreferences("tag_keywords", Context.MODE_PRIVATE)
+        val keywordsString = prefs.getString(tag, "") ?: ""
+        return if (keywordsString.isNotEmpty()) {
+            keywordsString.split(",").toMutableSet()
+        } else {
+            // Initialize default keywords for built-in tags
+            when (tag) {
+                "receipts" -> mutableSetOf("חשבונית", "קבלה", "שובר")
+                else -> mutableSetOf()
+            }
+        }
+    }
+
+    private fun saveTagKeywords(tag: String, keywords: Set<String>) {
+        val prefs = getSharedPreferences("tag_keywords", Context.MODE_PRIVATE)
+        prefs.edit().putString(tag, keywords.joinToString(",")).apply()
+    }
+
+    private fun getAllKeywordsExcept(excludeTag: String): Map<String, Set<String>> {
+        val prefs = getSharedPreferences("tag_keywords", Context.MODE_PRIVATE)
+        val allTags = (defaultTags + customTags).filter { it != excludeTag }
+        val keywordsMap = mutableMapOf<String, Set<String>>()
+
+        for (tag in allTags) {
+            val keywords = loadTagKeywords(tag)
+            if (keywords.isNotEmpty()) {
+                keywordsMap[tag] = keywords
+            }
+        }
+        return keywordsMap
+    }
+
+    private fun validateKeywords(tag: String, newKeywords: Set<String>): Pair<Boolean, String?> {
+        // Check if tag is archive or spam - these need unique keywords
+        val isExclusiveTag = tag == "archived" || tag == "spam"
+
+        if (!isExclusiveTag) {
+            // Non-exclusive tags can share keywords with other non-exclusive tags
+            // But cannot share with archive or spam
+            val archiveKeywords = loadTagKeywords("archived")
+            val spamKeywords = loadTagKeywords("spam")
+            val conflicts = newKeywords.intersect(archiveKeywords + spamKeywords)
+
+            if (conflicts.isNotEmpty()) {
+                return Pair(false, "These keywords are reserved for archive/spam: ${conflicts.joinToString(", ")}")
+            }
+            return Pair(true, null)
+        } else {
+            // Archive/spam must have unique keywords - no overlap with any other tag
+            val allOtherKeywords = getAllKeywordsExcept(tag).values.flatten().toSet()
+            val conflicts = newKeywords.intersect(allOtherKeywords)
+
+            if (conflicts.isNotEmpty()) {
+                val conflictingTags = getAllKeywordsExcept(tag)
+                    .filter { (_, keywords) -> keywords.any { it in conflicts } }
+                    .keys
+                return Pair(false, "Keywords must be unique for $tag. Conflicts with: ${conflictingTags.joinToString(", ")}")
+            }
+            return Pair(true, null)
+        }
+    }
+
+    private fun showKeywordsDialog(tag: String) {
+        val keywords = loadTagKeywords(tag)
+
+        // Create dialog layout
+        val scrollView = ScrollView(this)
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 20, 40, 20)
+        }
+        scrollView.addView(layout)
+
+        // Add header with explanation
+        val headerText = TextView(this).apply {
+            text = if (tag == "archived" || tag == "spam") {
+                "Keywords for auto-tagging as ${tag.capitalize()}\n\n⚠ These keywords must be unique (no overlap with other tags)"
+            } else {
+                "Keywords for auto-tagging as ${tag.capitalize()}\n\nMessages containing these keywords will be automatically tagged.\n\nNote: Keywords can be shared between tags except archive/spam."
+            }
+            textSize = 13f
+            setPadding(0, 0, 0, 20)
+        }
+        layout.addView(headerText)
+
+        // Show current keywords with delete buttons
+        val keywordViews = mutableMapOf<String, LinearLayout>()
+        for (keyword in keywords) {
+            val keywordRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = 8
+                }
+                setPadding(8, 8, 8, 8)
+                setBackgroundColor(0xFFF5F5F5.toInt())
+            }
+
+            val keywordText = TextView(this).apply {
+                text = keyword
+                textSize = 16f
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            }
+            keywordRow.addView(keywordText)
+
+            val deleteBtn = Button(this).apply {
+                text = "✕"
+                textSize = 14f
+                setTextColor(0xFFFF0000.toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setOnClickListener {
+                    keywords.remove(keyword)
+                    layout.removeView(keywordRow)
+                    keywordViews.remove(keyword)
+                }
+            }
+            keywordRow.addView(deleteBtn)
+
+            keywordViews[keyword] = keywordRow
+            layout.addView(keywordRow)
+        }
+
+        // Add input for new keyword
+        val newKeywordInput = EditText(this).apply {
+            hint = "Add new keyword"
+            inputType = InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setPadding(20, 20, 20, 20)
+        }
+        layout.addView(newKeywordInput)
+
+        val addKeywordButton = Button(this).apply {
+            text = "+ Add Keyword"
+            setOnClickListener {
+                val newKeyword = newKeywordInput.text.toString().trim()
+                if (newKeyword.isEmpty()) {
+                    Toast.makeText(this@SettingsActivity, "Keyword cannot be empty", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (keywords.contains(newKeyword)) {
+                    Toast.makeText(this@SettingsActivity, "Keyword already exists", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                // Add to temporary set (will be validated on save)
+                keywords.add(newKeyword)
+                newKeywordInput.text.clear()
+
+                // Create UI for new keyword
+                val keywordRow = LinearLayout(this@SettingsActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = 8
+                    }
+                    setPadding(8, 8, 8, 8)
+                    setBackgroundColor(0xFFF5F5F5.toInt())
+                }
+
+                val keywordText = TextView(this@SettingsActivity).apply {
+                    text = newKeyword
+                    textSize = 16f
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1f
+                    )
+                }
+                keywordRow.addView(keywordText)
+
+                val deleteBtn = Button(this@SettingsActivity).apply {
+                    text = "✕"
+                    textSize = 14f
+                    setTextColor(0xFFFF0000.toInt())
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                    setOnClickListener {
+                        keywords.remove(newKeyword)
+                        layout.removeView(keywordRow)
+                        keywordViews.remove(newKeyword)
+                    }
+                }
+                keywordRow.addView(deleteBtn)
+
+                keywordViews[newKeyword] = keywordRow
+                layout.addView(keywordRow, layout.childCount - 2) // Insert before input and button
+            }
+        }
+        layout.addView(addKeywordButton)
+
+        // Create dialog
+        AlertDialog.Builder(this)
+            .setTitle("Keywords for ${tag.capitalize()}")
+            .setView(scrollView)
+            .setPositiveButton("Save") { _, _ ->
+                // Validate keywords before saving
+                val (valid, errorMessage) = validateKeywords(tag, keywords)
+                if (!valid) {
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                    // Reopen dialog to fix the issue
+                    showKeywordsDialog(tag)
+                    return@setPositiveButton
+                }
+
+                saveTagKeywords(tag, keywords)
+                Toast.makeText(this, "Keywords saved for $tag", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }
