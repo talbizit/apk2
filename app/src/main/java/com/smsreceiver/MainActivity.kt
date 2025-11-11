@@ -122,7 +122,8 @@ class MainActivity : AppCompatActivity() {
             onItemLongClick = { position -> handleItemLongClick(position) },
             onRefreshNeeded = { refreshDisplay() },
             onSenderClick = { sender -> handleSenderClick(sender) },
-            getContactName = { phoneNumber -> getContactName(phoneNumber) }
+            getContactName = { phoneNumber -> getContactName(phoneNumber) },
+            onForwardClick = { sms -> forwardMessage(sms) }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = groupedAdapter
@@ -459,10 +460,8 @@ class MainActivity : AppCompatActivity() {
                             refreshDisplay()
                         }
                         ItemTouchHelper.LEFT -> {
-                            // Forward functionality
-                            forwardMessage(sms)
-                            // Restore the view since we're not removing the message
-                            groupedAdapter.notifyItemChanged(position)
+                            // Reveal forward button (user must click to actually forward)
+                            groupedAdapter.revealForwardButton(position)
                         }
                     }
                 } else {

@@ -20,7 +20,8 @@ class GroupedSmsAdapter(
     private val onItemLongClick: (Int) -> Boolean,
     private val onRefreshNeeded: () -> Unit,
     private val onSenderClick: (String) -> Unit,
-    private val getContactName: (String) -> String?
+    private val getContactName: (String) -> String?,
+    private val onForwardClick: (SmsData) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -34,6 +35,9 @@ class GroupedSmsAdapter(
             notifyDataSetChanged()
         }
 
+    var revealedForwardPosition: Int? = null
+        private set
+
     class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val headerText: TextView = view.findViewById(R.id.headerText)
         val checkBox: CheckBox = view.findViewById(R.id.checkBox)
@@ -45,6 +49,7 @@ class GroupedSmsAdapter(
         val messageText: TextView = view.findViewById(R.id.messageText)
         val timestampText: TextView = view.findViewById(R.id.timestampText)
         val checkBox: CheckBox = view.findViewById(R.id.checkBox)
+        val forwardButton: android.widget.Button = view.findViewById(R.id.forwardButton)
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -133,6 +138,16 @@ class GroupedSmsAdapter(
                     }
                 }
 
+                // Show/hide forward button based on reveal state
+                val isRevealed = revealedForwardPosition == position
+                messageHolder.forwardButton.visibility = if (isRevealed && !isSelectionMode) View.VISIBLE else View.GONE
+
+                // Set click listener on forward button
+                messageHolder.forwardButton.setOnClickListener {
+                    onForwardClick(item.sms)
+                    hideForwardButton()
+                }
+
                 // Set long-press on the entire card
                 val longClickListener = View.OnLongClickListener {
                     onItemLongClick(position)
@@ -147,6 +162,9 @@ class GroupedSmsAdapter(
                         item.isSelected = !item.isSelected
                         messageHolder.checkBox.isChecked = item.isSelected
                         onItemClick(position)
+                    } else if (isRevealed) {
+                        // Hide forward button when clicking elsewhere on the item
+                        hideForwardButton()
                     }
                 }
             }
@@ -256,5 +274,21 @@ class GroupedSmsAdapter(
         }
 
         items.addAll(filteredItems)
+    }
+
+    fun revealForwardButton(position: Int) {
+        val oldPosition = revealedForwardPosition
+        revealedForwardPosition = position
+
+        // Notify both old and new positions to update visibility
+        oldPosition?.let { notifyItemChanged(it) }
+        notifyItemChanged(position)
+    }
+
+    fun hideForwardButton() {
+        revealedForwardPosition?.let { position ->
+            revealedForwardPosition = null
+            notifyItemChanged(position)
+        }
     }
 }
