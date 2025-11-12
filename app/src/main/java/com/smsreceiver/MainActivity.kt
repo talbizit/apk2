@@ -134,10 +134,24 @@ class MainActivity : AppCompatActivity() {
         // Setup swipe to archive/restore
         setupSwipeGesture()
 
+        // Hide forward button on scroll
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                super.onScrollStateChanged(recyclerView, newState)
+                // Hide forward button when scrolling starts
+                if (newState != RecyclerView.SCROLL_STATE_IDLE) {
+                    groupedAdapter.hideForwardButton()
+                }
+            }
+        })
+
         // Setup tab switching
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 currentTab = tab?.position ?: 0
+
+                // Hide forward button when switching tabs
+                groupedAdapter.hideForwardButton()
 
                 // Show/hide archive subfolder row
                 if (currentTab == 3) {
@@ -587,6 +601,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshDisplay() {
+        // Hide forward button when refreshing display
+        groupedAdapter.hideForwardButton()
+
         val items = when (currentTab) {
             0 -> groupByInbox()      // No tags + not archived
             1 -> groupBySaved()      // "saved" tag + not archived
@@ -921,6 +938,9 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (isSelectionMode) {
             exitSelectionMode()
+        } else if (groupedAdapter.revealedForwardPosition != null) {
+            // Hide forward button if revealed
+            groupedAdapter.hideForwardButton()
         } else {
             super.onBackPressed()
         }
