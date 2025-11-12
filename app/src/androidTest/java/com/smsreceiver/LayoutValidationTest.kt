@@ -180,6 +180,9 @@ class LayoutValidationTest {
         assert(view.findViewById<android.view.View>(R.id.forwardButton) != null) {
             "item_sms missing forwardButton"
         }
+        assert(view.findViewById<android.view.View>(R.id.messageCard) != null) {
+            "item_sms missing messageCard"
+        }
     }
 
     /**

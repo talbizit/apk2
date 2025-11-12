@@ -50,6 +50,7 @@ class GroupedSmsAdapter(
         val timestampText: TextView = view.findViewById(R.id.timestampText)
         val checkBox: CheckBox = view.findViewById(R.id.checkBox)
         val forwardButton: android.widget.Button = view.findViewById(R.id.forwardButton)
+        val messageCard: View = view.findViewById(R.id.messageCard)
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -140,7 +141,13 @@ class GroupedSmsAdapter(
 
                 // Show/hide forward button based on reveal state
                 val isRevealed = revealedForwardPosition == position
-                messageHolder.forwardButton.visibility = if (isRevealed && !isSelectionMode) View.VISIBLE else View.GONE
+
+                // Animate the card to reveal/hide the forward button
+                val buttonWidth = 120 * messageHolder.itemView.context.resources.displayMetrics.density
+                messageHolder.messageCard.animate()
+                    .translationX(if (isRevealed && !isSelectionMode) -buttonWidth else 0f)
+                    .setDuration(200)
+                    .start()
 
                 // Set click listener on forward button
                 messageHolder.forwardButton.setOnClickListener {
@@ -152,18 +159,19 @@ class GroupedSmsAdapter(
                 val longClickListener = View.OnLongClickListener {
                     onItemLongClick(position)
                 }
-                holder.itemView.setOnLongClickListener(longClickListener)
+                messageHolder.messageCard.setOnLongClickListener(longClickListener)
                 messageHolder.senderText.setOnLongClickListener(longClickListener)
                 messageHolder.messageText.setOnLongClickListener(longClickListener)
                 messageHolder.timestampText.setOnLongClickListener(longClickListener)
 
-                holder.itemView.setOnClickListener {
+                // Click on card
+                messageHolder.messageCard.setOnClickListener {
                     if (isSelectionMode) {
                         item.isSelected = !item.isSelected
                         messageHolder.checkBox.isChecked = item.isSelected
                         onItemClick(position)
                     } else if (isRevealed) {
-                        // Hide forward button when clicking elsewhere on the item
+                        // Hide forward button when clicking on the message card
                         hideForwardButton()
                     }
                 }
