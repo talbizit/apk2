@@ -67,6 +67,9 @@ dependencies {
     implementation 'com.sun.mail:android-mail:1.6.7'
     implementation 'com.sun.mail:android-activation:1.6.7'
 
+    // WorkManager for scheduling reminders
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+
     // Testing dependencies
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.jetbrains.kotlin:kotlin-test:1.8.10'

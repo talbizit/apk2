@@ -6,8 +6,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import android.widget.HorizontalScrollView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 
 sealed class ListItem {
     data class Header(val title: String, var isSelected: Boolean = false, var isCollapsed: Boolean = false) : ListItem()
@@ -45,6 +48,8 @@ class GroupedSmsAdapter(
         val messageText: TextView = view.findViewById(R.id.messageText)
         val timestampText: TextView = view.findViewById(R.id.timestampText)
         val checkBox: CheckBox = view.findViewById(R.id.checkBox)
+        val tagsScrollView: HorizontalScrollView = view.findViewById(R.id.tagsScrollView)
+        val tagsChipGroup: ChipGroup = view.findViewById(R.id.tagsChipGroup)
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -105,6 +110,25 @@ class GroupedSmsAdapter(
                 messageHolder.senderText.text = displayName
                 messageHolder.messageText.text = item.sms.message
                 messageHolder.timestampText.text = item.sms.timestamp
+
+                // Display tags
+                if (item.sms.tags.isEmpty()) {
+                    messageHolder.tagsScrollView.visibility = View.GONE
+                } else {
+                    messageHolder.tagsScrollView.visibility = View.VISIBLE
+                    messageHolder.tagsChipGroup.removeAllViews()
+
+                    item.sms.tags.forEach { tag ->
+                        val chip = Chip(holder.itemView.context).apply {
+                            text = tag
+                            isClickable = false
+                            isCheckable = false
+                            setChipBackgroundColorResource(android.R.color.holo_blue_light)
+                            setTextColor(holder.itemView.context.getColor(android.R.color.white))
+                        }
+                        messageHolder.tagsChipGroup.addView(chip)
+                    }
+                }
 
                 // Make unread messages bold
                 val typefaceStyle = if (!item.sms.isRead) Typeface.BOLD else Typeface.NORMAL

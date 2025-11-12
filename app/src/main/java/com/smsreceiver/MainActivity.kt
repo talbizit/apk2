@@ -364,13 +364,14 @@ class MainActivity : AppCompatActivity() {
                     val tagsString = if (parts.size > 6) parts[6] else ""
                     val tags = if (tagsString.isNotEmpty()) tagsString.split(",").toMutableSet() else mutableSetOf()
                     val isRead = if (parts.size > 7) parts[7] == "1" else false
+                    val reminderTimestamp = if (parts.size > 8) parts[8].toLongOrNull() ?: 0L else 0L
 
                     // Migrate old isArchived to tag system
                     if (isArchived && !tags.contains("archived")) {
                         tags.add("archived")
                     }
 
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags, isRead))
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags, isRead, reminderTimestamp))
                 }
             }
         }
@@ -404,13 +405,14 @@ class MainActivity : AppCompatActivity() {
                     val tagsString = if (parts.size > 6) parts[6] else ""
                     val tags = if (tagsString.isNotEmpty()) tagsString.split(",").toMutableSet() else mutableSetOf()
                     val isRead = if (parts.size > 7) parts[7] == "1" else false
+                    val reminderTimestamp = if (parts.size > 8) parts[8].toLongOrNull() ?: 0L else 0L
 
                     // Migrate old isArchived to tag system
                     if (isArchived && !tags.contains("archived")) {
                         tags.add("archived")
                     }
 
-                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags, isRead))
+                    smsList.add(SmsData(parts[1], unescapedMessage, parts[0], timestampMillis, false, archiveTimestamp, tags, isRead, reminderTimestamp))
                 }
             }
         }
@@ -735,8 +737,8 @@ class MainActivity : AppCompatActivity() {
                 .replace("|", "\\|")
             val tagsString = sms.tags.joinToString(",")
             val isReadString = if (sms.isRead) "1" else "0"
-            // Format: timestamp|sender|message|deprecated|archiveTimestamp|timestampMillis|tags|isRead
-            "${sms.timestamp}|${sms.sender}|$escapedMessage|0|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString|$isReadString"
+            // Format: timestamp|sender|message|deprecated|archiveTimestamp|timestampMillis|tags|isRead|reminderTimestamp
+            "${sms.timestamp}|${sms.sender}|$escapedMessage|0|${sms.archiveTimestamp}|${sms.timestampMillis}|$tagsString|$isReadString|${sms.reminderTimestamp}"
         }
         prefs.edit().putString("sms_list", lines.joinToString("\n")).apply()
     }
@@ -1092,6 +1094,18 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(readButton)
 
+        // Set Reminder button
+        val reminderButton = Button(this).apply {
+            text = if (sms.reminderTimestamp > 0) "⏰ Update Reminder" else "⏰ Set Reminder"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 20
+            }
+        }
+        layout.addView(reminderButton)
+
         // Load custom tags from settings
         val tagPrefs = getSharedPreferences("tag_settings", Context.MODE_PRIVATE)
         val customTagsString = tagPrefs.getString("custom_tags", "") ?: ""
@@ -1159,6 +1173,12 @@ class MainActivity : AppCompatActivity() {
             dialog.dismiss()
         }
 
+        // Set Reminder button click
+        reminderButton.setOnClickListener {
+            showReminderTimePicker(sms)
+            dialog.dismiss()
+        }
+
         // Set checkbox listeners for all tags
         for ((tag, checkbox) in checkboxes) {
             checkbox.setOnCheckedChangeListener { _, isChecked ->
@@ -1185,6 +1205,60 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun showReminderTimePicker(sms: SmsData) {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 20, 40, 20)
+        }
+
+        val reminderOptions = listOf(
+            "5 minutes" to 5L * 60 * 1000,
+            "15 minutes" to 15L * 60 * 1000,
+            "30 minutes" to 30L * 60 * 1000,
+            "1 hour" to 60L * 60 * 1000,
+            "2 hours" to 2L * 60 * 60 * 1000,
+            "1 day" to 24L * 60 * 60 * 1000,
+            "Cancel Reminder" to 0L
+        )
+
+        reminderOptions.forEach { (label, delayMillis) ->
+            val button = Button(this).apply {
+                text = label
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = 10
+                }
+            }
+            button.setOnClickListener {
+                if (delayMillis == 0L) {
+                    // Cancel reminder
+                    sms.reminderTimestamp = 0L
+                    val reminderManager = ReminderManager(this)
+                    reminderManager.cancelReminder(sms)
+                    Toast.makeText(this, "Reminder cancelled", Toast.LENGTH_SHORT).show()
+                } else {
+                    // Set reminder
+                    val reminderTime = System.currentTimeMillis() + delayMillis
+                    sms.reminderTimestamp = reminderTime
+                    val reminderManager = ReminderManager(this)
+                    reminderManager.scheduleReminder(sms, reminderTime)
+                    Toast.makeText(this, "Reminder set for $label", Toast.LENGTH_SHORT).show()
+                }
+                saveAllSms()
+                refreshDisplay()
+            }
+            layout.addView(button)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("⏰ Set Reminder")
+            .setView(layout)
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun showAddToSpamListDialog(sender: String) {
