@@ -166,7 +166,7 @@ class LayoutValidationTest {
         val view = inflater.inflate(R.layout.item_sms, null)
 
         assert(view.findViewById<android.view.View>(R.id.senderText) != null) {
-            "item_sms missing senderText"
+            "item_sms missing senderText (hidden, but still present for code compatibility)"
         }
         assert(view.findViewById<android.view.View>(R.id.messageText) != null) {
             "item_sms missing messageText"
@@ -176,6 +176,9 @@ class LayoutValidationTest {
         }
         assert(view.findViewById<android.view.View>(R.id.checkBox) != null) {
             "item_sms missing checkBox"
+        }
+        assert(view.findViewById<android.view.View>(R.id.forwardButton) != null) {
+            "item_sms missing forwardButton"
         }
     }
 

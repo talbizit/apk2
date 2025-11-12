@@ -680,7 +680,9 @@ class MainActivity : AppCompatActivity() {
             val count = senderMessages.size
             val hasUnread = senderMessages.any { !it.isRead }
             val asterisk = if (hasUnread) "*" else ""
-            val headerTitle = "$asterisk$sender ($count)"
+            // Use contact name if available, otherwise use phone number
+            val displayName = getContactName(sender) ?: sender
+            val headerTitle = "$asterisk$displayName ($count)"
             result.add(ListItem.Header(headerTitle))
             senderMessages.forEach { result.add(ListItem.Message(it)) }
         }
