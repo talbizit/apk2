@@ -201,7 +201,8 @@
             android:layout_height="wrap_content"
             android:text="+ Add New Tag"
             style="?android:attr/borderlessButtonStyle"
-            android:textColor="?attr/colorPrimary" />
+            android:backgroundTint="@android:color/transparent"
+            android:textColor="?android:attr/textColorPrimary" />
 
         <View
             android:layout_width="match_parent"
@@ -266,6 +267,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="🚫 Manage Spam Senders"
+            style="?android:attr/borderlessButtonStyle"
+            android:backgroundTint="@android:color/transparent"
+            android:textColor="?android:attr/textColorPrimary"
             android:layout_marginBottom="16dp" />
 
         <View
@@ -298,6 +302,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="🗑️ Manage Trash"
+            style="?android:attr/borderlessButtonStyle"
+            android:backgroundTint="@android:color/transparent"
+            android:textColor="?android:attr/textColorPrimary"
             android:layout_marginBottom="16dp" />
 
         <View
@@ -313,6 +320,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Save Settings"
+            android:backgroundTint="#4CAF50"
+            android:textColor="#FFFFFF"
             android:layout_marginTop="16dp" />
 
     </LinearLayout>

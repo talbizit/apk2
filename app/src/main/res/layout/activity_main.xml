@@ -4,52 +4,50 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Settings Button Row -->
-    <RelativeLayout
-        android:id="@+id/settingsRowContainer"
+    <!-- Top Bar: Mark All Read + Settings (icons only, single line) -->
+    <LinearLayout
+        android:id="@+id/topBarContainer"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_alignParentTop="true"
-        android:background="#212121">
+        android:orientation="horizontal"
+        android:background="#212121"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
 
         <Button
-            android:id="@+id/settingsButton"
+            android:id="@+id/markAllReadButton"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:text="⚙"
-            android:textSize="18sp"
-            android:background="#212121"
+            android:text="📭"
+            android:textSize="22sp"
             android:textColor="#B0B0B0"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:backgroundTint="@android:color/transparent"
             style="?android:attr/borderlessButtonStyle"
             android:minWidth="0dp"
             android:minHeight="0dp"
             android:padding="0dp" />
 
-    </RelativeLayout>
-
-    <!-- Mark All Read Button Row -->
-    <LinearLayout
-        android:id="@+id/markAllReadRowContainer"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_below="@id/settingsRowContainer"
-        android:orientation="horizontal"
-        android:background="#3A3A3A"
-        android:gravity="center"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
 
         <Button
-            android:id="@+id/markAllReadButton"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:text="📭 Mark All as Read"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:background="#3A3A3A"
-            style="?android:attr/borderlessButtonStyle" />
+            android:id="@+id/settingsButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:text="⚙"
+            android:textSize="22sp"
+            android:textColor="#B0B0B0"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:backgroundTint="@android:color/transparent"
+            style="?android:attr/borderlessButtonStyle"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp" />
 
     </LinearLayout>
 
@@ -58,7 +56,7 @@
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/markAllReadRowContainer"
+        android:layout_below="@id/topBarContainer"
         android:background="#212121"
         app:tabTextColor="#B0B0B0"
         app:tabSelectedTextColor="#FFFFFF"

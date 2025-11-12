@@ -116,8 +116,14 @@ class LayoutValidationTest {
         assert(view.findViewById<android.view.View>(R.id.settingsButton) != null) {
             "activity_main missing settingsButton"
         }
+        assert(view.findViewById<android.view.View>(R.id.markAllReadButton) != null) {
+            "activity_main missing markAllReadButton"
+        }
         assert(view.findViewById<android.view.View>(R.id.tabLayout) != null) {
             "activity_main missing tabLayout"
+        }
+        assert(view.findViewById<android.view.View>(R.id.topBarContainer) != null) {
+            "activity_main missing topBarContainer"
         }
     }
 
