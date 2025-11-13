@@ -1,12 +1,17 @@
 package com.smsreceiver
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Typeface
 import android.text.method.LinkMovementMethod
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.CheckBox
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 
 sealed class ListItem {
@@ -45,6 +50,7 @@ class GroupedSmsAdapter(
         val messageText: TextView = view.findViewById(R.id.messageText)
         val timestampText: TextView = view.findViewById(R.id.timestampText)
         val checkBox: CheckBox = view.findViewById(R.id.checkBox)
+        val copyButton: Button = view.findViewById(R.id.copyButton)
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -130,6 +136,17 @@ class GroupedSmsAdapter(
                 messageHolder.senderText.setOnClickListener {
                     if (!isSelectionMode) {
                         onSenderClick(item.sms.sender)
+                    }
+                }
+
+                // Set click listener on copy button to copy message text
+                messageHolder.copyButton.setOnClickListener {
+                    if (!isSelectionMode) {
+                        val context = messageHolder.itemView.context
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("SMS Message", item.sms.message)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
                     }
                 }
 
