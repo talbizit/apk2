@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Settings Button Row -->
+    <!-- Toolbar with Settings and Mark All Read buttons -->
     <RelativeLayout
-        android:id="@+id/settingsRowContainer"
+        android:id="@+id/toolbarContainer"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_alignParentTop="true"
@@ -27,21 +27,11 @@
             android:minHeight="0dp"
             android:padding="0dp" />
 
-    </RelativeLayout>
-
-    <!-- Mark All Read Button Row -->
-    <RelativeLayout
-        android:id="@+id/markAllReadRowContainer"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_below="@id/settingsRowContainer"
-        android:background="#212121">
-
         <Button
             android:id="@+id/markAllReadButton"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_alignParentEnd="true"
+            android:layout_toStartOf="@id/settingsButton"
             android:layout_centerVertical="true"
             android:text="📭"
             android:textSize="18sp"
@@ -59,7 +49,7 @@
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/markAllReadRowContainer"
+        android:layout_below="@id/toolbarContainer"
         android:background="#212121"
         app:tabTextColor="#B0B0B0"
         app:tabSelectedTextColor="#FFFFFF"
