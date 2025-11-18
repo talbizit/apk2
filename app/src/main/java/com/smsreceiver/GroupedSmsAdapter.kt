@@ -51,6 +51,7 @@ class GroupedSmsAdapter(
         val timestampText: TextView = view.findViewById(R.id.timestampText)
         val checkBox: CheckBox = view.findViewById(R.id.checkBox)
         val copyButton: Button = view.findViewById(R.id.copyButton)
+        val addContactButton: Button = view.findViewById(R.id.addContactButton)
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -147,6 +148,13 @@ class GroupedSmsAdapter(
                         val clip = ClipData.newPlainText("SMS Message", item.sms.message)
                         clipboard.setPrimaryClip(clip)
                         Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                // Set click listener on add contact button to add sender to contacts
+                messageHolder.addContactButton.setOnClickListener {
+                    if (!isSelectionMode) {
+                        onSenderClick(item.sms.sender)
                     }
                 }
 

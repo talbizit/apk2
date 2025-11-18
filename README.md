@@ -40,7 +40,7 @@ Advanced Android SMS management application with intelligent organization, taggi
 #### Message Interaction
 - Copy message text with clipboard button (📋)
 - Clickable links in messages (auto-detect URLs, emails, phone numbers)
-- Sender name click to add/view contact
+- Add contact button (+) next to timestamp to add/view sender as contact
 - Long-press to open tag management dialog
 
 ### Message Management
@@ -72,8 +72,8 @@ Advanced Android SMS management application with intelligent organization, taggi
 - **Long Press**:
   - In Inbox/Saved/Receipts: Open tag management dialog
   - In Archive: Enter selection mode
-- **Click Sender**: Add sender to contacts (if not already a contact)
-- **Click Copy Button**: Copy message text to clipboard
+- **Click + Button**: Add sender to contacts (if not already a contact)
+- **Click Copy Button** (📋): Copy message text to clipboard
 
 ### Auto-Tagging
 
@@ -150,9 +150,9 @@ Advanced Android SMS management application with intelligent organization, taggi
 ### User Interface
 
 #### Toolbar
-- Settings button (⚙)
-- Mark All as Read button (📭)
+- Settings button (⚙) and Mark All as Read button (📭) on single row
 - Icon-only design for compact layout
+- Transparent button backgrounds (no colored backgrounds)
 
 #### Tab Navigation
 - Inbox, Saved, Receipts, Archive tabs
